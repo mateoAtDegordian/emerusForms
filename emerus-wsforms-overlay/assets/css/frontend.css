@@ -1,0 +1,81 @@
+.emerus-wsforms-overlay-root {
+  --ewo-max-width: 420px;
+  --ewo-offset-top: clamp(18px, 4vw, 42px);
+  --ewo-offset-side: clamp(12px, 2.5vw, 34px);
+  width: min(var(--ewo-max-width), calc(100vw - 24px));
+  z-index: 9998;
+}
+
+.emerus-wsforms-overlay-root.is-attached-to-hero {
+  position: absolute;
+  right: var(--ewo-offset-side);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.emerus-wsforms-overlay-root.is-fixed-fallback {
+  position: fixed;
+  right: var(--ewo-offset-side);
+  top: max(84px, 14vh);
+}
+
+.emerus-wsforms-overlay {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(11, 28, 44, 0.11);
+  border-radius: 16px;
+  box-shadow: 0 14px 40px rgba(15, 26, 40, 0.18);
+  backdrop-filter: blur(4px);
+}
+
+.emerus-wsforms-overlay__content {
+  padding: 16px 16px 14px;
+}
+
+.emerus-wsforms-overlay__title {
+  margin: 0;
+  color: #0f2233;
+  font-size: clamp(1.01rem, 1.15vw, 1.22rem);
+  line-height: 1.35;
+}
+
+.emerus-wsforms-overlay__subtitle {
+  margin: 8px 0 14px;
+  color: #446177;
+  font-size: 0.93rem;
+  line-height: 1.4;
+}
+
+.emerus-wsforms-overlay__form .wsf-form {
+  margin: 0;
+}
+
+.emerus-wsforms-overlay__form .wsf-button,
+.emerus-wsforms-overlay__form button[type='submit'] {
+  width: 100%;
+}
+
+@media (max-width: 1080px) {
+  .emerus-wsforms-overlay-root.is-attached-to-hero,
+  .emerus-wsforms-overlay-root.is-fixed-fallback {
+    right: 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  .emerus-wsforms-overlay-root.is-attached-to-hero,
+  .emerus-wsforms-overlay-root.is-fixed-fallback {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: 12px;
+    width: auto;
+    max-height: 72vh;
+    transform: none;
+    overflow: auto;
+  }
+
+  .emerus-wsforms-overlay {
+    box-shadow: 0 12px 28px rgba(15, 26, 40, 0.18);
+  }
+}
