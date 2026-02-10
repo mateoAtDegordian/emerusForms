@@ -1,30 +1,41 @@
 .emerus-wsforms-overlay-root {
   --ewo-max-width: 420px;
-  --ewo-offset-top: clamp(18px, 4vw, 42px);
-  --ewo-offset-side: clamp(12px, 2.5vw, 34px);
+  --ewo-right-offset: 22px;
+  --ewo-overlay-margin-top: clamp(14px, 2vw, 24px);
   width: min(var(--ewo-max-width), calc(100vw - 24px));
   z-index: 9998;
 }
 
 .emerus-wsforms-overlay-root.is-attached-to-hero {
   position: absolute;
-  right: var(--ewo-offset-side);
+  right: var(--ewo-right-offset);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .emerus-wsforms-overlay-root.is-fixed-fallback {
   position: fixed;
-  right: var(--ewo-offset-side);
+  right: var(--ewo-right-offset);
   top: max(84px, 14vh);
+}
+
+.emerus-wsforms-overlay-root.is-below-hero {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: none;
+  width: min(var(--ewo-max-width), calc(100% - 24px));
+  margin: var(--ewo-overlay-margin-top) auto 0;
+  z-index: 1;
 }
 
 .emerus-wsforms-overlay {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(11, 28, 44, 0.11);
-  border-radius: 16px;
-  box-shadow: 0 14px 40px rgba(15, 26, 40, 0.18);
-  backdrop-filter: blur(4px);
+  border-radius: 0;
+  box-shadow: 0 10px 26px rgba(15, 26, 40, 0.14);
 }
 
 .emerus-wsforms-overlay__content {
@@ -57,25 +68,26 @@
 @media (max-width: 1080px) {
   .emerus-wsforms-overlay-root.is-attached-to-hero,
   .emerus-wsforms-overlay-root.is-fixed-fallback {
-    right: 10px;
+    right: max(10px, var(--ewo-right-offset));
   }
 }
 
 @media (max-width: 900px) {
   .emerus-wsforms-overlay-root.is-attached-to-hero,
   .emerus-wsforms-overlay-root.is-fixed-fallback {
-    position: fixed;
-    left: 12px;
-    right: 12px;
+    position: relative;
+    left: auto;
+    right: auto;
     top: auto;
-    bottom: 12px;
-    width: auto;
-    max-height: 72vh;
+    bottom: auto;
+    width: min(var(--ewo-max-width), calc(100% - 24px));
+    max-height: none;
+    margin: var(--ewo-overlay-margin-top) auto 0;
     transform: none;
-    overflow: auto;
+    overflow: visible;
   }
 
   .emerus-wsforms-overlay {
-    box-shadow: 0 12px 28px rgba(15, 26, 40, 0.18);
+    box-shadow: 0 8px 20px rgba(15, 26, 40, 0.12);
   }
 }

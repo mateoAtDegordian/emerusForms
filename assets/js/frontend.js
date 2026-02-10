@@ -5,6 +5,9 @@
   }
 
   var config = window.EmerusWsFormsOverlay || {};
+  var mobileQuery = window.matchMedia('(max-width: 900px)');
+  var contentWidth = 1400;
+  var contentSideGap = 22;
   var maxWidth = parseInt(root.getAttribute('data-max-width') || config.maxWidth || 420, 10);
   if (!Number.isFinite(maxWidth)) {
     maxWidth = 420;
@@ -46,18 +49,62 @@
     return null;
   }
 
+  function setRightOffset(width) {
+    var viewportWidth = Number.isFinite(width) ? width : window.innerWidth;
+    var rightOffset = Math.max(12, ((viewportWidth - contentWidth) / 2) + contentSideGap);
+    root.style.setProperty('--ewo-right-offset', rightOffset + 'px');
+  }
+
+  function insertAfter(referenceNode, node) {
+    if (!referenceNode || !referenceNode.parentNode) {
+      return;
+    }
+    referenceNode.parentNode.insertBefore(node, referenceNode.nextSibling);
+  }
+
+  function resetClasses() {
+    root.classList.remove('is-fixed-fallback');
+    root.classList.remove('is-attached-to-hero');
+    root.classList.remove('is-below-hero');
+  }
+
   function placeOverlay() {
     var host = findHeroHost();
+    var isMobile = mobileQuery.matches;
 
     if (host) {
-      var computed = window.getComputedStyle(host);
-      if (computed.position === 'static') {
-        host.style.position = 'relative';
+      if (!isMobile) {
+        var computed = window.getComputedStyle(host);
+        if (computed.position === 'static') {
+          host.style.position = 'relative';
+        }
+        setRightOffset(host.getBoundingClientRect().width);
+        host.classList.add('emerus-overlay-host');
+        if (root.parentNode !== host) {
+          host.appendChild(root);
+        }
+        resetClasses();
+        root.classList.add('is-attached-to-hero');
+        return;
       }
+
       host.classList.add('emerus-overlay-host');
-      host.appendChild(root);
-      root.classList.remove('is-fixed-fallback');
-      root.classList.add('is-attached-to-hero');
+      setRightOffset(window.innerWidth);
+      insertAfter(host, root);
+      resetClasses();
+      root.classList.add('is-below-hero');
+      return;
+    }
+
+    if (isMobile) {
+      var main = document.querySelector('main');
+      if (main) {
+        main.appendChild(root);
+      } else if (document.body && root.parentNode !== document.body) {
+        document.body.appendChild(root);
+      }
+      resetClasses();
+      root.classList.add('is-below-hero');
       return;
     }
 
@@ -65,7 +112,8 @@
       document.body.appendChild(root);
     }
 
-    root.classList.remove('is-attached-to-hero');
+    setRightOffset(window.innerWidth);
+    resetClasses();
     root.classList.add('is-fixed-fallback');
   }
 
@@ -81,6 +129,11 @@
 
   window.addEventListener('load', placeOverlay);
   window.addEventListener('resize', debounce(placeOverlay, 120));
+  if (typeof mobileQuery.addEventListener === 'function') {
+    mobileQuery.addEventListener('change', placeOverlay);
+  } else if (typeof mobileQuery.addListener === 'function') {
+    mobileQuery.addListener(placeOverlay);
+  }
 
   window.EmerusZoho = {
     endpoint: config.restUrl || '',
