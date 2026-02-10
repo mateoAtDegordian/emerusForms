@@ -3,7 +3,7 @@
   --ewo-right-offset: 22px;
   --ewo-overlay-margin-top: clamp(14px, 2vw, 24px);
   width: min(var(--ewo-max-width), calc(100vw - 24px));
-  z-index: 9998;
+  z-index: 8;
 }
 
 .emerus-wsforms-overlay-root.is-attached-to-hero {
@@ -36,6 +36,13 @@
   border: 1px solid rgba(11, 28, 44, 0.11);
   border-radius: 0;
   box-shadow: 0 10px 26px rgba(15, 26, 40, 0.14);
+}
+
+/* Keep site nav/header above the injected form inside hero contexts. */
+.emerus-overlay-host header,
+.emerus-overlay-host .brxe-header {
+  position: relative;
+  z-index: 12;
 }
 
 .emerus-wsforms-overlay__content {
