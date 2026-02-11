@@ -2,6 +2,7 @@
   --ewo-max-width: 420px;
   --ewo-right-offset: 22px;
   --ewo-overlay-margin-top: clamp(14px, 2vw, 24px);
+  --ewo-mobile-overlap: clamp(14px, 4vw, 28px);
   width: min(var(--ewo-max-width), calc(100vw - 24px));
   z-index: 8;
 }
@@ -79,7 +80,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1040px) {
   .emerus-wsforms-overlay-root.is-attached-to-hero,
   .emerus-wsforms-overlay-root.is-fixed-fallback {
     position: relative;
@@ -92,6 +93,10 @@
     margin: var(--ewo-overlay-margin-top) auto 0;
     transform: none;
     overflow: visible;
+  }
+
+  .emerus-wsforms-overlay-root.is-below-hero {
+    margin: calc(var(--ewo-mobile-overlap) * -1) auto 0;
   }
 
   .emerus-wsforms-overlay {

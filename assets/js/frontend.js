@@ -5,7 +5,7 @@
   }
 
   var config = window.EmerusWsFormsOverlay || {};
-  var mobileQuery = window.matchMedia('(max-width: 900px)');
+  var mobileQuery = window.matchMedia('(max-width: 1040px)');
   var contentWidth = 1400;
   var contentSideGap = 22;
   var maxWidth = parseInt(root.getAttribute('data-max-width') || config.maxWidth || 420, 10);
