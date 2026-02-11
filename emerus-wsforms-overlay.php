@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -69,6 +69,71 @@ final class Emerus_WSForms_Overlay {
 JS;
     }
 
+    private function ws_integration_template() {
+        return <<<'JS'
+/*
+WS Form custom JS example (for forms already placed on page, not injected by plugin):
+
+1) Add this script in WS Form submit custom JS action.
+2) Update selector and mapping keys to your field names.
+3) Keep endpoint call via window.EmerusZoho.sendWsForm().
+*/
+(async function () {
+  var form = document.querySelector('#ws-form-123'); // TODO: your form selector
+  if (!form || !window.EmerusZoho) {
+    return;
+  }
+
+  try {
+    await window.EmerusZoho.sendWsForm(form, {
+      formVariant: 'product', // hero|product
+      mode: 'rows',           // rows|lead|both
+      includeEmpty: false,
+      mapFields: {
+        // your_form_field_name: 'Zoho_API_Field'
+        full_name: 'Last_Name',
+        email: 'Email',
+        phone: 'Phone',
+        interest: 'Interes',
+        message: 'Description'
+      },
+      staticLead: {
+        // Always injected into "lead" payload
+        Lead_Source: 'Website'
+      },
+      extraPayload: {
+        // Optional additional payload keys
+        // page_url: window.location.href
+      }
+    });
+  } catch (error) {
+    console.error('Zoho integration failed:', error);
+  }
+})();
+JS;
+    }
+
+    private function ws_payload_json_template() {
+        $template = [
+            'form_variant' => 'product',
+            'page_url'     => 'https://example.com/industrijski-profili',
+            'page_title'   => 'Industrijski profili - Emerus',
+            'rows'         => [
+                ['k' => 'Last_Name', 'v' => 'Test Korisnik'],
+                ['k' => 'Email', 'v' => 'test@example.com'],
+                ['k' => 'Phone', 'v' => '+38599111222'],
+            ],
+            'lead'         => [
+                'Last_Name'   => 'Test Korisnik',
+                'Email'       => 'test@example.com',
+                'Phone'       => '+38599111222',
+                'Lead_Source' => 'Website',
+            ],
+        ];
+
+        return (string) wp_json_encode($template, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
     private function defaults() {
         return [
             'hero_form_id'               => '',
@@ -79,6 +144,7 @@ JS;
             'product_pages'              => [],
             'product_rules'              => '',
             'product_replaces_hero'      => 1,
+            'load_helpers_globally'      => 1,
             'hero_title_hr'              => 'Zanima vas suradnja s Emerusom? Pošaljite nam upit.',
             'hero_title_en'              => 'Interested in working with Emerus? Send us your inquiry.',
             'hero_subtitle_hr'           => 'Brzi upit za najkraći put do ponude.',
@@ -127,6 +193,7 @@ JS;
             'product_pages'              => $this->sanitize_int_array(isset($raw['product_pages']) ? (array) $raw['product_pages'] : []),
             'product_rules'              => isset($raw['product_rules']) ? sanitize_textarea_field($raw['product_rules']) : $defaults['product_rules'],
             'product_replaces_hero'      => !empty($raw['product_replaces_hero']) ? 1 : 0,
+            'load_helpers_globally'      => !empty($raw['load_helpers_globally']) ? 1 : 0,
             'hero_title_hr'              => isset($raw['hero_title_hr']) ? sanitize_text_field($raw['hero_title_hr']) : $defaults['hero_title_hr'],
             'hero_title_en'              => isset($raw['hero_title_en']) ? sanitize_text_field($raw['hero_title_en']) : $defaults['hero_title_en'],
             'hero_subtitle_hr'           => isset($raw['hero_subtitle_hr']) ? sanitize_text_field($raw['hero_subtitle_hr']) : $defaults['hero_subtitle_hr'],
@@ -293,6 +360,11 @@ JS;
                             <label>
                                 <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_replaces_hero]" value="1" <?php checked((int) $options['product_replaces_hero'], 1); ?> />
                                 On product-targeted pages, show product form instead of hero form.
+                            </label>
+                            <br />
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[load_helpers_globally]" value="1" <?php checked((int) $options['load_helpers_globally'], 1); ?> />
+                                Load JS integration helpers on all frontend pages (needed for WS forms already on page).
                             </label>
                         </td>
                     </tr>
@@ -519,6 +591,37 @@ JS;
                     </tr>
                 </table>
 
+                <h2>WS Form Integration Template</h2>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row">Payload options</th>
+                        <td>
+                            <ul style="margin-top:0;">
+                                <li><code>formVariant</code>: <code>hero</code> or <code>product</code></li>
+                                <li><code>mode</code>: <code>rows</code>, <code>lead</code>, or <code>both</code></li>
+                                <li><code>includeEmpty</code>: include empty values (<code>true</code>/<code>false</code>)</li>
+                                <li><code>mapFields</code>: map form field names to Zoho API names</li>
+                                <li><code>staticLead</code>: extra fixed lead data always appended</li>
+                                <li><code>extraPayload</code>: extra top-level payload values</li>
+                            </ul>
+                            <p class="description">JSON sent to backend stays aligned with your tested format (rows and/or lead object).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="ws_integration_template">WS submit JS template</label></th>
+                        <td>
+                            <textarea id="ws_integration_template" readonly rows="24" class="large-text code"><?php echo esc_textarea($this->ws_integration_template()); ?></textarea>
+                            <p class="description">Copy this into WS Form submit custom JS and adjust selector + field mapping.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="ws_payload_json_template">JSON payload example</label></th>
+                        <td>
+                            <textarea id="ws_payload_json_template" readonly rows="20" class="large-text code"><?php echo esc_textarea($this->ws_payload_json_template()); ?></textarea>
+                        </td>
+                    </tr>
+                </table>
+
                 <?php submit_button(__('Save Settings', 'emerus-wsforms-overlay')); ?>
             </form>
         </div>
@@ -526,24 +629,32 @@ JS;
     }
 
     public function enqueue_assets() {
-        if (is_admin() || !$this->should_render_on_request()) {
+        if (is_admin()) {
             return;
         }
 
         $options = $this->get_options();
+        $should_render_overlay = $this->should_render_on_request();
+        $load_helpers_globally = (int) $options['load_helpers_globally'] === 1;
 
-        wp_enqueue_style(
-            'emerus-wsforms-overlay',
-            plugins_url('assets/css/frontend.css', __FILE__),
-            [],
-            '0.2.0'
-        );
+        if (!$should_render_overlay && !$load_helpers_globally) {
+            return;
+        }
+
+        if ($should_render_overlay) {
+            wp_enqueue_style(
+                'emerus-wsforms-overlay',
+                plugins_url('assets/css/frontend.css', __FILE__),
+                [],
+                '0.3.0'
+            );
+        }
 
         wp_enqueue_script(
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.2.0',
+            '0.3.0',
             true
         );
 

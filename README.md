@@ -18,6 +18,9 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
   - Define rules in plugin settings
   - Auto-fill hidden/empty fields in WS Form
   - Optional custom JS hook template
+- Zoho helper for WS forms already on page:
+  - `window.EmerusZoho.sendWsForm(form, options)`
+  - Does not require plugin-injected overlay form
 - Auto-injection in first hero-like Bricks section, fallback to fixed right panel
 - Optional Zoho CRM backend sending endpoint (disabled by default)
 
@@ -37,6 +40,7 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 5. Add EN/HR text values.
 6. Optional: fill per-page title/subtitle override tables.
 7. Optional: add `WS default field rules by page`.
+8. Optional: enable `Load JS integration helpers on all frontend pages`.
 
 ## WS Field Defaults (Hidden Field Support)
 
@@ -61,6 +65,34 @@ Custom JS hook:
 - Event name: `emerus-ws-defaults-applied`
 - Detail includes: `defaults`, `variant`, `pageId`, `pageSlug`, `appliedCount`
 - You can edit the `Custom JS hook` textarea in plugin settings as needed.
+
+## WS Submit Integration (Existing WS Forms)
+
+Use helper in your WS submit JS:
+
+```js
+await window.EmerusZoho.sendWsForm('#ws-form-123', {
+  formVariant: 'product',
+  mode: 'rows', // rows|lead|both
+  mapFields: {
+    full_name: 'Last_Name',
+    email: 'Email',
+    phone: 'Phone'
+  },
+  staticLead: {
+    Lead_Source: 'Website'
+  }
+});
+```
+
+Main options accepted by `sendWsForm(form, options)`:
+
+- `formVariant`: `hero` or `product`
+- `mode`: `rows`, `lead`, `both`
+- `includeEmpty`: `true` / `false`
+- `mapFields`: object for field name mapping
+- `staticLead`: object merged into `lead`
+- `extraPayload`: object merged at payload root
 
 ## Zoho Backend API
 

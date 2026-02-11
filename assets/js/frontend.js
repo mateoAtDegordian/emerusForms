@@ -1,24 +1,64 @@
 (function () {
-  var root = document.getElementById('emerus-wsforms-overlay-root');
-  if (!root) {
-    return;
-  }
-
   var config = window.EmerusWsFormsOverlay || {};
+  var root = document.getElementById('emerus-wsforms-overlay-root');
   var mobileQuery = window.matchMedia('(max-width: 1040px)');
   var contentWidth = 1400;
   var contentSideGap = 22;
-  var maxWidth = parseInt(root.getAttribute('data-max-width') || config.maxWidth || 420, 10);
-  if (!Number.isFinite(maxWidth)) {
-    maxWidth = 420;
-  }
-  root.style.setProperty('--ewo-max-width', maxWidth + 'px');
 
   function cssEscape(value) {
     if (window.CSS && typeof window.CSS.escape === 'function') {
       return window.CSS.escape(value);
     }
     return String(value).replace(/([ #;?%&,.+*~':"!^$\[\]()=>|/@])/g, '\\$1');
+  }
+
+  function asString(value) {
+    if (value === null || typeof value === 'undefined') {
+      return '';
+    }
+    return String(value);
+  }
+
+  function getCurrentVariant() {
+    if (root) {
+      return asString(root.getAttribute('data-variant') || 'hero');
+    }
+    return 'hero';
+  }
+
+  function dispatchFieldEvent(el, eventName) {
+    if (!el || !eventName) {
+      return;
+    }
+
+    if (typeof Event === 'function') {
+      el.dispatchEvent(new Event(eventName, { bubbles: true }));
+      return;
+    }
+
+    var legacyEvent = document.createEvent('Event');
+    legacyEvent.initEvent(eventName, true, true);
+    el.dispatchEvent(legacyEvent);
+  }
+
+  function resolveFormElement(formOrSelector) {
+    if (!formOrSelector) {
+      return null;
+    }
+
+    if (typeof formOrSelector === 'string') {
+      return document.querySelector(formOrSelector);
+    }
+
+    if (formOrSelector.nodeType === 1 && (formOrSelector.tagName || '').toLowerCase() === 'form') {
+      return formOrSelector;
+    }
+
+    if (formOrSelector.nodeType === 1) {
+      return formOrSelector.closest('form');
+    }
+
+    return null;
   }
 
   function isVisible(el) {
@@ -57,25 +97,37 @@
   }
 
   function setRightOffset(width) {
+    if (!root) {
+      return;
+    }
+
     var viewportWidth = Number.isFinite(width) ? width : window.innerWidth;
     var rightOffset = Math.max(12, ((viewportWidth - contentWidth) / 2) + contentSideGap);
     root.style.setProperty('--ewo-right-offset', rightOffset + 'px');
   }
 
   function insertAfter(referenceNode, node) {
-    if (!referenceNode || !referenceNode.parentNode) {
+    if (!referenceNode || !referenceNode.parentNode || !node) {
       return;
     }
     referenceNode.parentNode.insertBefore(node, referenceNode.nextSibling);
   }
 
   function resetClasses() {
+    if (!root) {
+      return;
+    }
+
     root.classList.remove('is-fixed-fallback');
     root.classList.remove('is-attached-to-hero');
     root.classList.remove('is-below-hero');
   }
 
   function placeOverlay() {
+    if (!root) {
+      return;
+    }
+
     var host = findHeroHost();
     var isMobile = mobileQuery.matches;
 
@@ -137,11 +189,11 @@
       return false;
     }
 
-    var pageId = String(config.pageId || '');
-    var pageSlug = String(config.pageSlug || '').toLowerCase();
+    var pageId = asString(config.pageId || '');
+    var pageSlug = asString(config.pageSlug || '').toLowerCase();
 
     for (var i = 0; i < rule.refs.length; i += 1) {
-      var ref = String(rule.refs[i] || '').toLowerCase();
+      var ref = asString(rule.refs[i] || '').toLowerCase();
       if (ref === '*') {
         return true;
       }
@@ -156,8 +208,8 @@
     return false;
   }
 
-  function resolveDefaults() {
-    var variant = root.getAttribute('data-variant') || 'hero';
+  function resolveDefaults(variant) {
+    var effectiveVariant = asString(variant || getCurrentVariant() || 'hero');
     var defaults = {};
     var rules = Array.isArray(config.wsDefaultRules) ? config.wsDefaultRules : [];
 
@@ -167,8 +219,8 @@
         continue;
       }
 
-      var ruleVariant = String(rule.variant || 'both');
-      if (ruleVariant !== 'both' && ruleVariant !== variant) {
+      var ruleVariant = asString(rule.variant || 'both');
+      if (ruleVariant !== 'both' && ruleVariant !== effectiveVariant) {
         continue;
       }
 
@@ -176,14 +228,14 @@
         continue;
       }
 
-      defaults[String(rule.field)] = String(rule.value || '');
+      defaults[asString(rule.field)] = asString(rule.value || '');
     }
 
     return defaults;
   }
 
   function getMatchingFields(container, fieldName) {
-    if (!container) {
+    if (!container || !fieldName) {
       return [];
     }
 
@@ -209,18 +261,18 @@
     return found;
   }
 
-  function setFieldValue(el, value) {
+  function setFieldValue(el, value, allowOverwrite) {
     if (!el) {
       return false;
     }
 
-    var tagName = (el.tagName || '').toLowerCase();
-    var type = (el.type || '').toLowerCase();
+    var tagName = asString(el.tagName).toLowerCase();
+    var type = asString(el.type).toLowerCase();
 
     if (tagName === 'select') {
       var hasOption = false;
       for (var i = 0; i < el.options.length; i += 1) {
-        if (String(el.options[i].value) === String(value)) {
+        if (asString(el.options[i].value) === asString(value)) {
           hasOption = true;
           break;
         }
@@ -228,17 +280,20 @@
       if (!hasOption) {
         return false;
       }
+      if (!allowOverwrite && asString(el.value).trim() !== '') {
+        return false;
+      }
       el.value = value;
     } else if (type === 'checkbox') {
       var truthy = ['1', 'true', 'yes', 'on'];
-      el.checked = truthy.indexOf(String(value).toLowerCase()) !== -1;
+      el.checked = truthy.indexOf(asString(value).toLowerCase()) !== -1;
     } else if (type === 'radio') {
-      if (String(el.value) !== String(value)) {
+      if (asString(el.value) !== asString(value)) {
         return false;
       }
       el.checked = true;
     } else {
-      if (type !== 'hidden' && String(el.value || '').trim() !== '') {
+      if (!allowOverwrite && type !== 'hidden' && asString(el.value).trim() !== '') {
         return false;
       }
       el.value = value;
@@ -249,76 +304,227 @@
     return true;
   }
 
-  function dispatchFieldEvent(el, eventName) {
-    if (!el || !eventName) {
-      return;
+  function applyDefaultsToContainer(container, variant, options) {
+    if (!container) {
+      return {
+        defaults: {},
+        variant: variant || 'hero',
+        appliedCount: 0
+      };
     }
 
-    if (typeof Event === 'function') {
-      el.dispatchEvent(new Event(eventName, { bubbles: true }));
-      return;
-    }
-
-    var legacyEvent = document.createEvent('Event');
-    legacyEvent.initEvent(eventName, true, true);
-    el.dispatchEvent(legacyEvent);
-  }
-
-  function applyWsDefaults() {
-    var formContainer = root.querySelector('.emerus-wsforms-overlay__form');
-    if (!formContainer) {
-      return false;
-    }
-
-    var defaults = resolveDefaults();
+    var opts = options || {};
+    var allowOverwrite = !!opts.overwrite;
+    var defaults = resolveDefaults(variant);
     var keys = Object.keys(defaults);
     var appliedCount = 0;
 
     for (var i = 0; i < keys.length; i += 1) {
       var fieldName = keys[i];
-      var fields = getMatchingFields(formContainer, fieldName);
+      var fields = getMatchingFields(container, fieldName);
       for (var j = 0; j < fields.length; j += 1) {
-        if (setFieldValue(fields[j], defaults[fieldName])) {
+        if (setFieldValue(fields[j], defaults[fieldName], allowOverwrite)) {
           appliedCount += 1;
         }
       }
     }
 
-    config.resolvedDefaults = defaults;
-    window.EmerusWsFormsOverlay = config;
-
-    if (typeof window.CustomEvent === 'function') {
-      window.dispatchEvent(new CustomEvent('emerus-ws-defaults-applied', {
-        detail: {
-          defaults: defaults,
-          variant: root.getAttribute('data-variant') || 'hero',
-          pageId: config.pageId || 0,
-          pageSlug: config.pageSlug || '',
-          appliedCount: appliedCount
-        }
-      }));
-    }
-
-    return true;
+    return {
+      defaults: defaults,
+      variant: asString(variant || getCurrentVariant() || 'hero'),
+      appliedCount: appliedCount
+    };
   }
 
-  function applyWsDefaultsWithRetry(attempt) {
-    var maxAttempts = 30;
-    if (applyWsDefaults()) {
+  function emitDefaultsEvent(result) {
+    if (typeof window.CustomEvent !== 'function') {
       return;
     }
 
-    if (attempt >= maxAttempts) {
+    window.dispatchEvent(new CustomEvent('emerus-ws-defaults-applied', {
+      detail: {
+        defaults: result.defaults || {},
+        variant: result.variant || 'hero',
+        pageId: config.pageId || 0,
+        pageSlug: config.pageSlug || '',
+        appliedCount: result.appliedCount || 0
+      }
+    }));
+  }
+
+  function applyDefaults(formOrSelector, options) {
+    var opts = options || {};
+    var variant = asString(opts.variant || getCurrentVariant() || 'hero');
+
+    var container;
+    if (!formOrSelector && root) {
+      container = root.querySelector('.emerus-wsforms-overlay__form');
+    } else {
+      container = resolveFormElement(formOrSelector);
+    }
+
+    var result = applyDefaultsToContainer(container, variant, opts);
+    config.resolvedDefaults = result.defaults;
+    window.EmerusWsFormsOverlay = config;
+    emitDefaultsEvent(result);
+
+    return result;
+  }
+
+  function applyDefaultsWithRetry(formOrSelector, options, attempt) {
+    var maxAttempts = 30;
+    var currentAttempt = attempt || 0;
+    var result = applyDefaults(formOrSelector, options);
+
+    if ((result.appliedCount > 0 || Object.keys(result.defaults).length === 0) || currentAttempt >= maxAttempts) {
       return;
     }
 
     setTimeout(function () {
-      applyWsDefaultsWithRetry(attempt + 1);
+      applyDefaultsWithRetry(formOrSelector, options, currentAttempt + 1);
     }, 160);
   }
 
-  config.getResolvedDefaults = function () {
-    var values = resolveDefaults();
+  function collectPairsFromForm(form, options) {
+    var opts = options || {};
+    var includeEmpty = !!opts.includeEmpty;
+    var mapFields = opts.mapFields && typeof opts.mapFields === 'object' ? opts.mapFields : {};
+    var data = new window.FormData(form);
+    var pairs = [];
+
+    data.forEach(function (value, key) {
+      var finalKey = asString(mapFields[key] || key).trim();
+      if (!finalKey) {
+        return;
+      }
+
+      var finalValue = asString(value);
+      if (!includeEmpty && finalValue.trim() === '') {
+        return;
+      }
+
+      pairs.push({
+        k: finalKey,
+        v: finalValue
+      });
+    });
+
+    return pairs;
+  }
+
+  function pairsToLead(pairs) {
+    var lead = {};
+    for (var i = 0; i < pairs.length; i += 1) {
+      var pair = pairs[i];
+      if (!pair || !pair.k) {
+        continue;
+      }
+
+      if (typeof lead[pair.k] === 'undefined') {
+        lead[pair.k] = pair.v;
+      } else {
+        lead[pair.k] = asString(lead[pair.k]) + ', ' + asString(pair.v);
+      }
+    }
+    return lead;
+  }
+
+  function mergeObjects(base, extra) {
+    var merged = {};
+    var key;
+
+    for (key in base) {
+      if (Object.prototype.hasOwnProperty.call(base, key)) {
+        merged[key] = base[key];
+      }
+    }
+
+    for (key in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, key)) {
+        merged[key] = extra[key];
+      }
+    }
+
+    return merged;
+  }
+
+  async function sendLead(payload) {
+    if (!config.restUrl) {
+      throw new Error('Zoho endpoint URL is missing.');
+    }
+
+    var response = await fetch(config.restUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': config.nonce || ''
+      },
+      body: JSON.stringify(payload || {})
+    });
+
+    var data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok) {
+      var message = (data && data.message) ? data.message : 'Zoho request failed.';
+      throw new Error(message);
+    }
+
+    return data;
+  }
+
+  async function sendWsForm(formOrSelector, options) {
+    var opts = options || {};
+    var form = resolveFormElement(formOrSelector);
+
+    if (!form) {
+      throw new Error('WS form element not found.');
+    }
+
+    var variant = asString(opts.formVariant || opts.variant || getCurrentVariant() || 'hero');
+    if (opts.applyDefaults !== false) {
+      applyDefaultsWithRetry(form, { variant: variant, overwrite: !!opts.overwriteDefaults }, 0);
+    }
+
+    var pairs = collectPairsFromForm(form, {
+      includeEmpty: !!opts.includeEmpty,
+      mapFields: opts.mapFields || {}
+    });
+
+    var lead = pairsToLead(pairs);
+    var staticLead = opts.staticLead && typeof opts.staticLead === 'object' ? opts.staticLead : {};
+    lead = mergeObjects(lead, staticLead);
+
+    var mode = asString(opts.mode || 'rows').toLowerCase();
+    if (['rows', 'lead', 'both'].indexOf(mode) === -1) {
+      mode = 'rows';
+    }
+
+    var payload = {
+      form_variant: variant,
+      page_url: window.location.href,
+      page_title: document.title
+    };
+
+    if (mode === 'rows' || mode === 'both') {
+      payload.rows = pairs;
+    }
+
+    if (mode === 'lead' || mode === 'both') {
+      payload.lead = lead;
+    }
+
+    if (opts.extraPayload && typeof opts.extraPayload === 'object') {
+      payload = mergeObjects(payload, opts.extraPayload);
+    }
+
+    return sendLead(payload);
+  }
+
+  config.getResolvedDefaults = function (variant) {
+    var values = resolveDefaults(variant || getCurrentVariant());
     var copy = {};
     var keys = Object.keys(values);
     for (var i = 0; i < keys.length; i += 1) {
@@ -326,64 +532,69 @@
     }
     return copy;
   };
-  config.applyResolvedDefaults = applyWsDefaults;
+
+  config.applyResolvedDefaults = function (formOrSelector, options) {
+    return applyDefaults(formOrSelector, options || {});
+  };
+
   window.EmerusWsFormsOverlay = config;
-
-  placeOverlay();
-  applyWsDefaultsWithRetry(0);
-
-  var refreshPlacement = debounce(function () {
-    placeOverlay();
-    applyWsDefaultsWithRetry(0);
-  }, 120);
-
-  window.addEventListener('load', refreshPlacement);
-  window.addEventListener('resize', refreshPlacement);
-  if (typeof mobileQuery.addEventListener === 'function') {
-    mobileQuery.addEventListener('change', refreshPlacement);
-  } else if (typeof mobileQuery.addListener === 'function') {
-    mobileQuery.addListener(refreshPlacement);
-  }
-
-  if (typeof window.MutationObserver === 'function') {
-    var observer = new MutationObserver(debounce(function () {
-      applyWsDefaultsWithRetry(0);
-    }, 80));
-
-    observer.observe(root, {
-      childList: true,
-      subtree: true
-    });
-  }
 
   window.EmerusZoho = {
     endpoint: config.restUrl || '',
     nonce: config.nonce || '',
-    sendLead: async function (payload) {
-      if (!this.endpoint) {
-        throw new Error('Zoho endpoint URL is missing.');
+    sendLead: sendLead,
+    sendWsForm: sendWsForm,
+    applyDefaults: function (formOrSelector, options) {
+      return applyDefaults(formOrSelector, options || {});
+    },
+    collectRows: function (formOrSelector, options) {
+      var form = resolveFormElement(formOrSelector);
+      if (!form) {
+        return [];
       }
-
-      var response = await fetch(this.endpoint, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': this.nonce
-        },
-        body: JSON.stringify(payload || {})
-      });
-
-      var data = await response.json().catch(function () {
-        return {};
-      });
-
-      if (!response.ok) {
-        var message = (data && data.message) ? data.message : 'Zoho request failed.';
-        throw new Error(message);
-      }
-
-      return data;
+      return collectPairsFromForm(form, options || {});
+    },
+    collectLead: function (formOrSelector, options) {
+      var rows = this.collectRows(formOrSelector, options || {});
+      var lead = pairsToLead(rows);
+      var staticLead = options && options.staticLead && typeof options.staticLead === 'object' ? options.staticLead : {};
+      return mergeObjects(lead, staticLead);
     }
   };
+
+  if (root) {
+    var maxWidth = parseInt(root.getAttribute('data-max-width') || config.maxWidth || 420, 10);
+    if (!Number.isFinite(maxWidth)) {
+      maxWidth = 420;
+    }
+    root.style.setProperty('--ewo-max-width', maxWidth + 'px');
+
+    placeOverlay();
+    applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+
+    var refreshPlacement = debounce(function () {
+      placeOverlay();
+      applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+    }, 120);
+
+    window.addEventListener('load', refreshPlacement);
+    window.addEventListener('resize', refreshPlacement);
+
+    if (typeof mobileQuery.addEventListener === 'function') {
+      mobileQuery.addEventListener('change', refreshPlacement);
+    } else if (typeof mobileQuery.addListener === 'function') {
+      mobileQuery.addListener(refreshPlacement);
+    }
+
+    if (typeof window.MutationObserver === 'function') {
+      var observer = new MutationObserver(debounce(function () {
+        applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+      }, 80));
+
+      observer.observe(root, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
 })();
