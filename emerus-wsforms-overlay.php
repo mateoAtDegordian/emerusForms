@@ -75,36 +75,77 @@ JS;
 WS Form custom JS example (for forms already placed on page, not injected by plugin):
 
 1) Add this script in WS Form submit custom JS action.
-2) Update selector and mapping keys to your field names.
-3) Keep endpoint call via window.EmerusZoho.sendWsForm().
+2) Replace each #PLACEHOLDER_* selector with your real field ID selector.
+3) It sends both "rows" and "lead" JSON, same structure as your tested PHP format.
 */
 (async function () {
-  var form = document.querySelector('#ws-form-123'); // TODO: your form selector
-  if (!form || !window.EmerusZoho) {
+  if (!window.EmerusZoho || !window.EmerusZoho.sendLead) {
     return;
   }
 
+  var selectors = {
+    Last_Name: '#PLACEHOLDER_FULL_NAME_ID',
+    Email: '#PLACEHOLDER_EMAIL_ID',
+    Phone: '#PLACEHOLDER_PHONE_ID',
+    Interes: '#PLACEHOLDER_INTEREST_ID',
+    GDPR_Consent: '#PLACEHOLDER_GDPR_ID',
+    Description: '#PLACEHOLDER_MESSAGE_ID'
+  };
+
+  function getValueBySelector(selector) {
+    var el = document.querySelector(selector);
+    if (!el) {
+      return '';
+    }
+
+    var tag = (el.tagName || '').toLowerCase();
+    var type = (el.type || '').toLowerCase();
+
+    if (type === 'checkbox') {
+      return el.checked ? '1' : '0';
+    }
+
+    if (type === 'radio') {
+      var checked = document.querySelector(selector + ':checked');
+      return checked ? String(checked.value || '').trim() : '';
+    }
+
+    if (tag === 'select') {
+      return String(el.value || '').trim();
+    }
+
+    return String(el.value || '').trim();
+  }
+
   try {
-    await window.EmerusZoho.sendWsForm(form, {
-      formVariant: 'product', // hero|product
-      mode: 'rows',           // rows|lead|both
-      includeEmpty: false,
-      mapFields: {
-        // your_form_field_name: 'Zoho_API_Field'
-        full_name: 'Last_Name',
-        email: 'Email',
-        phone: 'Phone',
-        interest: 'Interes',
-        message: 'Description'
-      },
-      staticLead: {
-        // Always injected into "lead" payload
-        Lead_Source: 'Website'
-      },
-      extraPayload: {
-        // Optional additional payload keys
-        // page_url: window.location.href
+    var lead = {
+      Last_Name: getValueBySelector(selectors.Last_Name),
+      Email: getValueBySelector(selectors.Email),
+      Phone: getValueBySelector(selectors.Phone),
+      Interes: getValueBySelector(selectors.Interes),
+      GDPR_Consent: getValueBySelector(selectors.GDPR_Consent),
+      Description: getValueBySelector(selectors.Description),
+      Lead_Source: 'Website'
+    };
+
+    if (!lead.Last_Name) {
+      lead.Last_Name = 'Website Lead';
+    }
+
+    var rows = [];
+    Object.keys(lead).forEach(function (key) {
+      var value = String(lead[key] || '');
+      if (value.trim() !== '') {
+        rows.push({ k: key, v: value });
       }
+    });
+
+    await window.EmerusZoho.sendLead({
+      form_variant: 'product', // hero or product
+      page_url: window.location.href,
+      page_title: document.title,
+      rows: rows,
+      lead: lead
     });
   } catch (error) {
     console.error('Zoho integration failed:', error);
@@ -122,12 +163,19 @@ JS;
                 ['k' => 'Last_Name', 'v' => 'Test Korisnik'],
                 ['k' => 'Email', 'v' => 'test@example.com'],
                 ['k' => 'Phone', 'v' => '+38599111222'],
+                ['k' => 'Interes', 'v' => 'Industrijski profili'],
+                ['k' => 'GDPR_Consent', 'v' => '1'],
+                ['k' => 'Description', 'v' => 'Zanima me više detalja.'],
+                ['k' => 'Lead_Source', 'v' => 'Website'],
             ],
             'lead'         => [
-                'Last_Name'   => 'Test Korisnik',
-                'Email'       => 'test@example.com',
-                'Phone'       => '+38599111222',
-                'Lead_Source' => 'Website',
+                'Last_Name'    => 'Test Korisnik',
+                'Email'        => 'test@example.com',
+                'Phone'        => '+38599111222',
+                'Interes'      => 'Industrijski profili',
+                'GDPR_Consent' => '1',
+                'Description'  => 'Zanima me više detalja.',
+                'Lead_Source'  => 'Website',
             ],
         ];
 

@@ -68,24 +68,34 @@ Custom JS hook:
 
 ## WS Submit Integration (Existing WS Forms)
 
-Use helper in your WS submit JS:
+You can send directly by field `#id` selectors (recommended for your case):
 
 ```js
-await window.EmerusZoho.sendWsForm('#ws-form-123', {
-  formVariant: 'product',
-  mode: 'rows', // rows|lead|both
-  mapFields: {
-    full_name: 'Last_Name',
-    email: 'Email',
-    phone: 'Phone'
-  },
-  staticLead: {
-    Lead_Source: 'Website'
-  }
+var lead = {
+  Last_Name: document.querySelector('#PLACEHOLDER_FULL_NAME_ID')?.value || '',
+  Email: document.querySelector('#PLACEHOLDER_EMAIL_ID')?.value || '',
+  Phone: document.querySelector('#PLACEHOLDER_PHONE_ID')?.value || '',
+  Interes: document.querySelector('#PLACEHOLDER_INTEREST_ID')?.value || '',
+  GDPR_Consent: document.querySelector('#PLACEHOLDER_GDPR_ID')?.checked ? '1' : '0',
+  Lead_Source: 'Website'
+};
+
+var rows = Object.keys(lead)
+  .filter((k) => String(lead[k] || '').trim() !== '')
+  .map((k) => ({ k, v: String(lead[k]) }));
+
+await window.EmerusZoho.sendLead({
+  form_variant: 'product',
+  page_url: window.location.href,
+  page_title: document.title,
+  rows,
+  lead
 });
 ```
 
-Main options accepted by `sendWsForm(form, options)`:
+Alternative helper still available: `window.EmerusZoho.sendWsForm(form, options)`.
+
+Main options for `sendWsForm(form, options)`:
 
 - `formVariant`: `hero` or `product`
 - `mode`: `rows`, `lead`, `both`
