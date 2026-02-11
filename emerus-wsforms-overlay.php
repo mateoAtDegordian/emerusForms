@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.1.1
+ * Version: 0.2.0
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -55,6 +55,20 @@ final class Emerus_WSForms_Overlay {
         add_settings_error('emerus_wsforms_overlay_messages', 'emerus_wsforms_overlay_saved', __('Settings saved.', 'emerus-wsforms-overlay'), 'updated');
     }
 
+    private function default_custom_js_template() {
+        return <<<'JS'
+(function () {
+  // Optional hook: runs after plugin script and after defaults are applied.
+  // Useful for advanced WS Form field logic.
+  window.addEventListener('emerus-ws-defaults-applied', function (event) {
+    var detail = event.detail || {};
+    // Example:
+    // console.log('Resolved defaults:', detail.defaults, 'variant:', detail.variant);
+  });
+})();
+JS;
+    }
+
     private function defaults() {
         return [
             'hero_form_id'               => '',
@@ -73,7 +87,11 @@ final class Emerus_WSForms_Overlay {
             'product_title_en'           => 'Request an offer for this product or service.',
             'product_subtitle_hr'        => 'Pošaljite detalje projekta i javit ćemo se brzo.',
             'product_subtitle_en'        => 'Share project details and we will get back quickly.',
+            'hero_page_overrides'        => [],
+            'product_page_overrides'     => [],
             'product_page_texts'         => "", // page_id_or_slug|hr title|en title
+            'ws_default_rules'           => '',
+            'ws_custom_js'               => $this->default_custom_js_template(),
             'overlay_max_width'          => 420,
             'zoho_enabled'               => 0,
             'zoho_client_id'             => '',
@@ -117,7 +135,11 @@ final class Emerus_WSForms_Overlay {
             'product_title_en'           => isset($raw['product_title_en']) ? sanitize_text_field($raw['product_title_en']) : $defaults['product_title_en'],
             'product_subtitle_hr'        => isset($raw['product_subtitle_hr']) ? sanitize_text_field($raw['product_subtitle_hr']) : $defaults['product_subtitle_hr'],
             'product_subtitle_en'        => isset($raw['product_subtitle_en']) ? sanitize_text_field($raw['product_subtitle_en']) : $defaults['product_subtitle_en'],
+            'hero_page_overrides'        => $this->sanitize_page_overrides(isset($raw['hero_page_overrides']) ? (array) $raw['hero_page_overrides'] : []),
+            'product_page_overrides'     => $this->sanitize_page_overrides(isset($raw['product_page_overrides']) ? (array) $raw['product_page_overrides'] : []),
             'product_page_texts'         => isset($raw['product_page_texts']) ? sanitize_textarea_field($raw['product_page_texts']) : $defaults['product_page_texts'],
+            'ws_default_rules'           => isset($raw['ws_default_rules']) ? sanitize_textarea_field($raw['ws_default_rules']) : $defaults['ws_default_rules'],
+            'ws_custom_js'               => isset($raw['ws_custom_js']) ? $this->sanitize_custom_js($raw['ws_custom_js']) : $defaults['ws_custom_js'],
             'overlay_max_width'          => isset($raw['overlay_max_width']) ? max(280, min(640, absint($raw['overlay_max_width']))) : $defaults['overlay_max_width'],
             'zoho_enabled'               => !empty($raw['zoho_enabled']) ? 1 : 0,
             'zoho_client_id'             => isset($raw['zoho_client_id']) ? sanitize_text_field($raw['zoho_client_id']) : $defaults['zoho_client_id'],
@@ -139,9 +161,96 @@ final class Emerus_WSForms_Overlay {
         return $options;
     }
 
+    private function sanitize_custom_js($value) {
+        if (!current_user_can('unfiltered_html')) {
+            return '';
+        }
+
+        $value = str_replace(["\r\n", "\r"], "\n", (string) $value);
+        return trim($value);
+    }
+
     private function sanitize_int_array(array $values) {
         $values = array_filter(array_map('absint', $values));
         return array_values(array_unique($values));
+    }
+
+    private function sanitize_page_overrides(array $rows) {
+        $clean = [];
+
+        foreach ($rows as $page_id => $row) {
+            $page_id = absint($page_id);
+            if (!$page_id || !is_array($row)) {
+                continue;
+            }
+
+            $item = [
+                'title_hr'    => isset($row['title_hr']) ? sanitize_text_field($row['title_hr']) : '',
+                'title_en'    => isset($row['title_en']) ? sanitize_text_field($row['title_en']) : '',
+                'subtitle_hr' => isset($row['subtitle_hr']) ? sanitize_text_field($row['subtitle_hr']) : '',
+                'subtitle_en' => isset($row['subtitle_en']) ? sanitize_text_field($row['subtitle_en']) : '',
+            ];
+
+            $has_value = false;
+            foreach ($item as $value) {
+                if ($value !== '') {
+                    $has_value = true;
+                    break;
+                }
+            }
+
+            if (!$has_value) {
+                continue;
+            }
+
+            $clean[(string) $page_id] = $item;
+        }
+
+        return $clean;
+    }
+
+    private function render_page_overrides_table(array $pages, $option_field, array $values) {
+        ?>
+        <div style="max-height: 360px; overflow: auto; border: 1px solid #dcdcde;">
+            <table class="widefat striped" style="margin: 0;">
+                <thead>
+                    <tr>
+                        <th style="width: 230px;">Page</th>
+                        <th>Title HR</th>
+                        <th>Title EN</th>
+                        <th>Subtitle HR</th>
+                        <th>Subtitle EN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($pages as $page) : ?>
+                        <?php
+                        $page_id = (int) $page->ID;
+                        $row     = isset($values[(string) $page_id]) && is_array($values[(string) $page_id]) ? $values[(string) $page_id] : [];
+                        ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html($page->post_title ? $page->post_title : sprintf('#%d', $page_id)); ?></strong><br />
+                                <code>ID: <?php echo $page_id; ?></code> · <code><?php echo esc_html((string) $page->post_name); ?></code>
+                            </td>
+                            <td>
+                                <input type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo $page_id; ?>][title_hr]" value="<?php echo esc_attr(isset($row['title_hr']) ? (string) $row['title_hr'] : ''); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo $page_id; ?>][title_en]" value="<?php echo esc_attr(isset($row['title_en']) ? (string) $row['title_en'] : ''); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo $page_id; ?>][subtitle_hr]" value="<?php echo esc_attr(isset($row['subtitle_hr']) ? (string) $row['subtitle_hr'] : ''); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo $page_id; ?>][subtitle_en]" value="<?php echo esc_attr(isset($row['subtitle_en']) ? (string) $row['subtitle_en'] : ''); ?>" />
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
     }
 
     public function render_admin_page() {
@@ -254,11 +363,17 @@ final class Emerus_WSForms_Overlay {
                     </tr>
                     <tr>
                         <th scope="row"><label for="hero_subtitle_hr">Hero subtitle (HR)</label></th>
-                        <td><input type="text" id="hero_subtitle_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[hero_subtitle_hr]" value="<?php echo esc_attr($options['hero_subtitle_hr']); ?>" class="large-text" /></td>
+                        <td>
+                            <input type="text" id="hero_subtitle_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[hero_subtitle_hr]" value="<?php echo esc_attr($options['hero_subtitle_hr']); ?>" class="large-text" />
+                            <p class="description">Type <code>hide</code> to hide subtitle globally.</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="hero_subtitle_en">Hero subtitle (EN)</label></th>
-                        <td><input type="text" id="hero_subtitle_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[hero_subtitle_en]" value="<?php echo esc_attr($options['hero_subtitle_en']); ?>" class="large-text" /></td>
+                        <td>
+                            <input type="text" id="hero_subtitle_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[hero_subtitle_en]" value="<?php echo esc_attr($options['hero_subtitle_en']); ?>" class="large-text" />
+                            <p class="description">Type <code>hide</code> to hide subtitle globally.</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="product_title_hr">Product title (HR)</label></th>
@@ -270,22 +385,62 @@ final class Emerus_WSForms_Overlay {
                     </tr>
                     <tr>
                         <th scope="row"><label for="product_subtitle_hr">Product subtitle (HR)</label></th>
-                        <td><input type="text" id="product_subtitle_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_subtitle_hr]" value="<?php echo esc_attr($options['product_subtitle_hr']); ?>" class="large-text" /></td>
+                        <td>
+                            <input type="text" id="product_subtitle_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_subtitle_hr]" value="<?php echo esc_attr($options['product_subtitle_hr']); ?>" class="large-text" />
+                            <p class="description">Type <code>hide</code> to hide subtitle globally.</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="product_subtitle_en">Product subtitle (EN)</label></th>
-                        <td><input type="text" id="product_subtitle_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_subtitle_en]" value="<?php echo esc_attr($options['product_subtitle_en']); ?>" class="large-text" /></td>
+                        <td>
+                            <input type="text" id="product_subtitle_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_subtitle_en]" value="<?php echo esc_attr($options['product_subtitle_en']); ?>" class="large-text" />
+                            <p class="description">Type <code>hide</code> to hide subtitle globally.</p>
+                        </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="product_page_texts">Per-page product titles</label></th>
+                        <th scope="row">Hero per-page title/subtitle</th>
                         <td>
-                            <textarea id="product_page_texts" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_page_texts]" rows="6" class="large-text code"><?php echo esc_textarea($options['product_page_texts']); ?></textarea>
-                            <p class="description">One line per rule: <code>page_id_or_slug|Croatian title|English title</code></p>
+                            <p class="description">Leave fields empty to use global defaults. Use <code>hide</code> in subtitle to hide subtitle on that page.</p>
+                            <?php $this->render_page_overrides_table($pages, 'hero_page_overrides', isset($options['hero_page_overrides']) ? (array) $options['hero_page_overrides'] : []); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Product per-page title/subtitle</th>
+                        <td>
+                            <p class="description">Leave fields empty to use global defaults. Use <code>hide</code> in subtitle to hide subtitle on that page.</p>
+                            <?php $this->render_page_overrides_table($pages, 'product_page_overrides', isset($options['product_page_overrides']) ? (array) $options['product_page_overrides'] : []); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="product_page_texts">Legacy product title rules</label></th>
+                        <td>
+                            <textarea id="product_page_texts" name="<?php echo esc_attr(self::OPTION_KEY); ?>[product_page_texts]" rows="4" class="large-text code"><?php echo esc_textarea($options['product_page_texts']); ?></textarea>
+                            <p class="description">Optional legacy fallback format: <code>page_id_or_slug|Croatian title|English title</code>.</p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="overlay_max_width">Overlay max width (px)</label></th>
                         <td><input type="number" id="overlay_max_width" min="280" max="640" name="<?php echo esc_attr(self::OPTION_KEY); ?>[overlay_max_width]" value="<?php echo (int) $options['overlay_max_width']; ?>" /></td>
+                    </tr>
+                </table>
+
+                <h2>WS Form Defaults / JS</h2>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row"><label for="ws_default_rules">Default field rules by page</label></th>
+                        <td>
+                            <textarea id="ws_default_rules" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_default_rules]" rows="7" class="large-text code"><?php echo esc_textarea($options['ws_default_rules']); ?></textarea>
+                            <p class="description">One rule per line: <code>page_refs|field_name|value|variant</code></p>
+                            <p class="description">Examples: <code>industrijski-profili,solar|Interes|Industrijski profili|product</code> or <code>*|Lead_Type|Website|both</code></p>
+                            <p class="description"><code>page_refs</code> accepts page IDs and/or slugs separated by comma. <code>variant</code> is <code>hero</code>, <code>product</code>, or <code>both</code>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="ws_custom_js">Custom JS hook (optional)</label></th>
+                        <td>
+                            <textarea id="ws_custom_js" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_custom_js]" rows="10" class="large-text code"><?php echo esc_textarea($options['ws_custom_js']); ?></textarea>
+                            <p class="description">Runs after plugin JS. You can listen to event <code>emerus-ws-defaults-applied</code> and adjust form behavior.</p>
+                        </td>
                     </tr>
                 </table>
 
@@ -381,24 +536,34 @@ final class Emerus_WSForms_Overlay {
             'emerus-wsforms-overlay',
             plugins_url('assets/css/frontend.css', __FILE__),
             [],
-            '0.1.1'
+            '0.2.0'
         );
 
         wp_enqueue_script(
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.1.1',
+            '0.2.0',
             true
         );
 
+        $page = get_post(get_queried_object_id());
+
         wp_localize_script('emerus-wsforms-overlay', 'EmerusWsFormsOverlay', [
-            'restUrl'     => esc_url_raw(rest_url('emerus-wsforms/v1/zoho-lead')),
-            'nonce'       => wp_create_nonce('wp_rest'),
-            'maxWidth'    => (int) $options['overlay_max_width'],
-            'currentPath' => wp_parse_url(home_url(add_query_arg([])), PHP_URL_PATH),
-            'lang'        => $this->current_lang_code(),
+            'restUrl'        => esc_url_raw(rest_url('emerus-wsforms/v1/zoho-lead')),
+            'nonce'          => wp_create_nonce('wp_rest'),
+            'maxWidth'       => (int) $options['overlay_max_width'],
+            'currentPath'    => wp_parse_url(home_url(add_query_arg([])), PHP_URL_PATH),
+            'lang'           => $this->current_lang_code(),
+            'pageId'         => (int) get_queried_object_id(),
+            'pageSlug'       => $page ? (string) $page->post_name : '',
+            'wsDefaultRules' => $this->parse_ws_default_rules((string) $options['ws_default_rules']),
         ]);
+
+        $custom_js = trim((string) $options['ws_custom_js']);
+        if ($custom_js !== '') {
+            wp_add_inline_script('emerus-wsforms-overlay', $custom_js, 'after');
+        }
     }
 
     public function render_overlay() {
@@ -427,11 +592,9 @@ final class Emerus_WSForms_Overlay {
         }
 
         $form_id = $variant === 'product' ? $options['product_form_id'] : $options['hero_form_id'];
-        $title   = $this->resolve_title($variant, $options);
-
-        $subtitle = $this->current_lang_code() === 'hr'
-            ? ($variant === 'product' ? $options['product_subtitle_hr'] : $options['hero_subtitle_hr'])
-            : ($variant === 'product' ? $options['product_subtitle_en'] : $options['hero_subtitle_en']);
+        $copy    = $this->resolve_copy($variant, $options);
+        $title   = (string) $copy['title'];
+        $subtitle = (string) $copy['subtitle'];
 
         $form_markup = '';
         if (shortcode_exists('ws_form')) {
@@ -453,7 +616,9 @@ final class Emerus_WSForms_Overlay {
             <div class="emerus-wsforms-overlay" role="complementary" aria-label="Inquiry form overlay">
                 <div class="emerus-wsforms-overlay__content">
                     <h3 class="emerus-wsforms-overlay__title"><?php echo esc_html($title); ?></h3>
-                    <p class="emerus-wsforms-overlay__subtitle"><?php echo esc_html($subtitle); ?></p>
+                    <?php if ($subtitle !== '') : ?>
+                        <p class="emerus-wsforms-overlay__subtitle"><?php echo esc_html($subtitle); ?></p>
+                    <?php endif; ?>
                     <div class="emerus-wsforms-overlay__form" data-emerus-form-variant="<?php echo esc_attr($variant); ?>">
                         <?php echo $form_markup; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                     </div>
@@ -529,24 +694,58 @@ final class Emerus_WSForms_Overlay {
         return false;
     }
 
-    private function resolve_title($variant, array $options) {
-        $lang = $this->current_lang_code();
+    private function resolve_copy($variant, array $options) {
+        $lang          = $this->current_lang_code() === 'hr' ? 'hr' : 'en';
+        $title_key     = 'title_' . $lang;
+        $subtitle_key  = 'subtitle_' . $lang;
+        $default_title = $variant === 'product' ? (string) $options['product_' . $title_key] : (string) $options['hero_' . $title_key];
+        $default_sub   = $variant === 'product' ? (string) $options['product_' . $subtitle_key] : (string) $options['hero_' . $subtitle_key];
 
-        if ($variant === 'product') {
-            $page_specific = $this->resolve_product_page_title($lang, (string) $options['product_page_texts']);
-            if ($page_specific !== '') {
-                return $page_specific;
+        $title    = $default_title;
+        $subtitle = $default_sub;
+
+        $override = $this->resolve_page_override_copy($variant, $options);
+        if (!empty($override[$title_key])) {
+            $title = (string) $override[$title_key];
+        } elseif ($variant === 'product') {
+            // Backward compatibility with old product title rules.
+            $legacy = $this->resolve_legacy_product_page_title($lang, (string) $options['product_page_texts']);
+            if ($legacy !== '') {
+                $title = $legacy;
             }
         }
 
-        if ($lang === 'hr') {
-            return $variant === 'product' ? $options['product_title_hr'] : $options['hero_title_hr'];
+        if (array_key_exists($subtitle_key, $override) && (string) $override[$subtitle_key] !== '') {
+            $subtitle = (string) $override[$subtitle_key];
         }
 
-        return $variant === 'product' ? $options['product_title_en'] : $options['hero_title_en'];
+        if ($this->is_hide_marker($subtitle)) {
+            $subtitle = '';
+        }
+
+        return [
+            'title'    => $title,
+            'subtitle' => $subtitle,
+        ];
     }
 
-    private function resolve_product_page_title($lang, $rules) {
+    private function resolve_page_override_copy($variant, array $options) {
+        $page_id = (int) get_queried_object_id();
+        if (!$page_id) {
+            return [];
+        }
+
+        $key       = $variant === 'product' ? 'product_page_overrides' : 'hero_page_overrides';
+        $overrides = isset($options[$key]) && is_array($options[$key]) ? $options[$key] : [];
+
+        if (!isset($overrides[(string) $page_id]) || !is_array($overrides[(string) $page_id])) {
+            return [];
+        }
+
+        return $overrides[(string) $page_id];
+    }
+
+    private function resolve_legacy_product_page_title($lang, $rules) {
         $post = get_post(get_queried_object_id());
         if (!$post) {
             return '';
@@ -572,6 +771,66 @@ final class Emerus_WSForms_Overlay {
         }
 
         return '';
+    }
+
+    private function is_hide_marker($value) {
+        $value = strtolower(trim((string) $value));
+        return in_array($value, ['hide', '__hide__', '[hide]'], true);
+    }
+
+    private function parse_ws_default_rules($rules_text) {
+        $lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $rules_text)));
+        $rules = [];
+
+        foreach ($lines as $line) {
+            $parts = array_map('trim', explode('|', $line));
+            if (count($parts) < 3) {
+                continue;
+            }
+
+            $refs_raw = array_filter(array_map('trim', explode(',', (string) $parts[0])));
+            $refs     = [];
+
+            foreach ($refs_raw as $ref) {
+                if ($ref === '*') {
+                    $refs[] = '*';
+                    continue;
+                }
+
+                if (ctype_digit($ref)) {
+                    $refs[] = (string) absint($ref);
+                    continue;
+                }
+
+                $slug = sanitize_title($ref);
+                if ($slug !== '') {
+                    $refs[] = $slug;
+                }
+            }
+
+            $field = sanitize_text_field((string) $parts[1]);
+            if ($field === '') {
+                continue;
+            }
+
+            $variant = isset($parts[3]) ? sanitize_key((string) $parts[3]) : 'both';
+            if (!in_array($variant, ['hero', 'product', 'both'], true)) {
+                $variant = 'both';
+            }
+
+            if (empty($refs)) {
+                $refs[] = '*';
+            }
+
+            $rules[] = [
+                'refs'    => array_values(array_unique($refs)),
+                'field'   => $field,
+                'value'   => sanitize_text_field((string) $parts[2]),
+                'variant' => $variant,
+            ];
+        }
+
+        return $rules;
     }
 
     private function current_lang_code() {

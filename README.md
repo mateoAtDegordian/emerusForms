@@ -10,13 +10,21 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 - Page targeting:
   - Select pages in plugin settings
   - Optional regex URL rules (one per line)
-- Language-ready frontend text (Croatian + English)
+- Global + per-page copy control (Croatian + English):
+  - Title and subtitle for hero/product
+  - Per-page override tables for both variants
+  - `hide` keyword support to hide subtitle
+- WS default field values by page/variant:
+  - Define rules in plugin settings
+  - Auto-fill hidden/empty fields in WS Form
+  - Optional custom JS hook template
 - Auto-injection in first hero-like Bricks section, fallback to fixed right panel
 - Optional Zoho CRM backend sending endpoint (disabled by default)
 
 ## Install
 
 1. Copy folder `emerus-wsforms-overlay` into `wp-content/plugins/`.
+   - Folder must contain `emerus-wsforms-overlay.php` and `assets/`.
 2. Activate **Emerus WS Forms Overlay** in WordPress admin.
 3. Open `Settings -> Emerus WS Forms Overlay`.
 
@@ -27,6 +35,32 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 3. Choose page targeting for product variant.
 4. Keep `Hero show everywhere` enabled so hero appears on all pages.
 5. Add EN/HR text values.
+6. Optional: fill per-page title/subtitle override tables.
+7. Optional: add `WS default field rules by page`.
+
+## WS Field Defaults (Hidden Field Support)
+
+Rule format in plugin settings:
+
+- `page_refs|field_name|value|variant`
+
+Examples:
+
+- `industrijski-profili,solarni-sustavi|Interes|Industrijski profili|product`
+- `42|Lead_Type|Hero Inquiry|hero`
+- `*|Lead_Source|Website|both`
+
+How WS Form should receive the value:
+
+1. Create a field (hidden or normal) with name exactly matching `field_name` (for example `Interes`).
+2. The plugin auto-fills matching fields when the form renders.
+3. For custom/advanced markup, you can use attribute `data-emerus-default="Interes"`.
+
+Custom JS hook:
+
+- Event name: `emerus-ws-defaults-applied`
+- Detail includes: `defaults`, `variant`, `pageId`, `pageSlug`, `appliedCount`
+- You can edit the `Custom JS hook` textarea in plugin settings as needed.
 
 ## Zoho Backend API
 
@@ -77,5 +111,3 @@ window.EmerusZoho.sendLead({
 ## Notes
 
 - If both variants target a page, product variant can replace hero (setting available).
-- For page-specific product titles, use format:
-  - `page_id_or_slug|Croatian title|English title`
