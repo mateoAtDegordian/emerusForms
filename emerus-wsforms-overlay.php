@@ -83,13 +83,20 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     return;
   }
 
+  // Replace placeholders with your actual field IDs.
+  // Remove keys you do not need.
   var selectors = {
     Last_Name: '#PLACEHOLDER_FULL_NAME_ID',
+    First_Name: '#PLACEHOLDER_FIRST_NAME_ID',
     Email: '#PLACEHOLDER_EMAIL_ID',
     Phone: '#PLACEHOLDER_PHONE_ID',
+    Lead_Source: '#PLACEHOLDER_LEAD_SOURCE_ID',
+    Description: '#PLACEHOLDER_DESCRIPTION_ID',
     Interes: '#PLACEHOLDER_INTEREST_ID',
-    GDPR_Consent: '#PLACEHOLDER_GDPR_ID',
-    Description: '#PLACEHOLDER_MESSAGE_ID'
+    'Landing Page': '#PLACEHOLDER_LANDING_PAGE_ID',
+    'Page Title': '#PLACEHOLDER_PAGE_TITLE_ID',
+    'UTM polja': '#PLACEHOLDER_UTM_POLJA_ID',
+    'Proizvod/Usluga': '#PLACEHOLDER_PROIZVOD_USLUGA_ID'
   };
 
   function getValueBySelector(selector) {
@@ -120,12 +127,16 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
   try {
     var lead = {
       Last_Name: getValueBySelector(selectors.Last_Name),
+      First_Name: getValueBySelector(selectors.First_Name),
       Email: getValueBySelector(selectors.Email),
       Phone: getValueBySelector(selectors.Phone),
-      Interes: getValueBySelector(selectors.Interes),
-      GDPR_Consent: getValueBySelector(selectors.GDPR_Consent),
+      Lead_Source: getValueBySelector(selectors.Lead_Source) || 'Website',
       Description: getValueBySelector(selectors.Description),
-      Lead_Source: 'Website'
+      Interes: getValueBySelector(selectors.Interes),
+      'Landing Page': getValueBySelector(selectors['Landing Page']) || window.location.href,
+      'Page Title': getValueBySelector(selectors['Page Title']) || document.title,
+      'UTM polja': getValueBySelector(selectors['UTM polja']),
+      'Proizvod/Usluga': getValueBySelector(selectors['Proizvod/Usluga'])
     };
 
     if (!lead.Last_Name) {
@@ -161,21 +172,29 @@ JS;
             'page_title'   => 'Industrijski profili - Emerus',
             'rows'         => [
                 ['k' => 'Last_Name', 'v' => 'Test Korisnik'],
+                ['k' => 'First_Name', 'v' => 'Test'],
                 ['k' => 'Email', 'v' => 'test@example.com'],
                 ['k' => 'Phone', 'v' => '+38599111222'],
-                ['k' => 'Interes', 'v' => 'Industrijski profili'],
-                ['k' => 'GDPR_Consent', 'v' => '1'],
-                ['k' => 'Description', 'v' => 'Zanima me više detalja.'],
                 ['k' => 'Lead_Source', 'v' => 'Website'],
+                ['k' => 'Description', 'v' => 'Opis upita.'],
+                ['k' => 'Interes', 'v' => 'Industrijski profili'],
+                ['k' => 'Landing Page', 'v' => 'https://example.com/industrijski-profili'],
+                ['k' => 'Page Title', 'v' => 'Industrijski profili - Emerus'],
+                ['k' => 'UTM polja', 'v' => 'utm_source=google&utm_medium=cpc'],
+                ['k' => 'Proizvod/Usluga', 'v' => 'Industrijski profili'],
             ],
             'lead'         => [
-                'Last_Name'    => 'Test Korisnik',
-                'Email'        => 'test@example.com',
-                'Phone'        => '+38599111222',
-                'Interes'      => 'Industrijski profili',
-                'GDPR_Consent' => '1',
-                'Description'  => 'Zanima me više detalja.',
-                'Lead_Source'  => 'Website',
+                'Last_Name'        => 'Test Korisnik',
+                'First_Name'       => 'Test',
+                'Email'            => 'test@example.com',
+                'Phone'            => '+38599111222',
+                'Lead_Source'      => 'Website',
+                'Description'      => 'Opis upita.',
+                'Interes'          => 'Industrijski profili',
+                'Landing Page'     => 'https://example.com/industrijski-profili',
+                'Page Title'       => 'Industrijski profili - Emerus',
+                'UTM polja'        => 'utm_source=google&utm_medium=cpc',
+                'Proizvod/Usluga'  => 'Industrijski profili',
             ],
         ];
 
