@@ -75,7 +75,8 @@ JS;
 WS Form custom JS example (for forms already placed on page, not injected by plugin):
 
 1) Add this script in WS Form submit custom JS action.
-2) Replace each #PLACEHOLDER_* selector with your real field ID selector.
+2) Replace placeholders with your real field references.
+   You can use: raw ID (e.g. 351), #id, or any valid CSS selector.
 3) It sends both "rows" and "lead" JSON, same structure as your tested PHP format.
 */
 (async function () {
@@ -85,23 +86,51 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
 
   var formKey = 'PLACEHOLDER_FORM_KEY'; // npr. "services_products_en"
 
-  // Replace placeholders with your actual field IDs.
+  // Replace placeholders with your actual field refs (351, #field-id, .class, [name="x"]).
   // Remove keys you do not need.
   var selectors = {
-    Last_Name: '#PLACEHOLDER_FULL_NAME_ID',
-    First_Name: '#PLACEHOLDER_FIRST_NAME_ID',
-    Email: '#PLACEHOLDER_EMAIL_ID',
-    Phone: '#PLACEHOLDER_PHONE_ID',
-    Description: '#PLACEHOLDER_DESCRIPTION_ID',
-    Interes: '#PLACEHOLDER_INTEREST_ID',
-    'Landing Page': '#PLACEHOLDER_LANDING_PAGE_ID',
-    'Page Title': '#PLACEHOLDER_PAGE_TITLE_ID',
-    'UTM polja': '#PLACEHOLDER_UTM_POLJA_ID',
-    'Proizvod/Usluga': '#PLACEHOLDER_PROIZVOD_USLUGA_ID'
+    Last_Name: 'PLACEHOLDER_FULL_NAME_ID_OR_SELECTOR',
+    First_Name: 'PLACEHOLDER_FIRST_NAME_ID_OR_SELECTOR',
+    Email: 'PLACEHOLDER_EMAIL_ID_OR_SELECTOR',
+    Phone: 'PLACEHOLDER_PHONE_ID_OR_SELECTOR',
+    Description: 'PLACEHOLDER_DESCRIPTION_ID_OR_SELECTOR',
+    Interes: 'PLACEHOLDER_INTEREST_ID_OR_SELECTOR',
+    'Landing Page': 'PLACEHOLDER_LANDING_PAGE_ID_OR_SELECTOR',
+    'Page Title': 'PLACEHOLDER_PAGE_TITLE_ID_OR_SELECTOR',
+    'UTM polja': 'PLACEHOLDER_UTM_POLJA_ID_OR_SELECTOR',
+    'Proizvod/Usluga': 'PLACEHOLDER_PROIZVOD_USLUGA_ID_OR_SELECTOR'
   };
 
-  function getValueBySelector(selector) {
-    var el = document.querySelector(selector);
+  function getElementByRef(ref) {
+    var value = String(ref || '').trim();
+    if (!value) {
+      return null;
+    }
+
+    if (value.charAt(0) === '#') {
+      var byHashId = document.getElementById(value.slice(1));
+      if (byHashId) {
+        return byHashId;
+      }
+    }
+
+    // WS often uses numeric IDs (e.g. 351), so try direct getElementById first.
+    if (/^[A-Za-z0-9_-]+$/.test(value)) {
+      var byId = document.getElementById(value);
+      if (byId) {
+        return byId;
+      }
+    }
+
+    try {
+      return document.querySelector(value);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getValueByRef(ref) {
+    var el = getElementByRef(ref);
     if (!el) {
       return '';
     }
@@ -114,7 +143,14 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     }
 
     if (type === 'radio') {
-      var checked = document.querySelector(selector + ':checked');
+      var checked = null;
+      if (el.name) {
+        try {
+          checked = document.querySelector('input[type=\"radio\"][name=\"' + (window.CSS && window.CSS.escape ? window.CSS.escape(el.name) : el.name) + '\"]:checked');
+        } catch (e) {
+          checked = null;
+        }
+      }
       return checked ? String(checked.value || '').trim() : '';
     }
 
@@ -127,16 +163,16 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
 
   try {
     var lead = {
-      Last_Name: getValueBySelector(selectors.Last_Name),
-      First_Name: getValueBySelector(selectors.First_Name),
-      Email: getValueBySelector(selectors.Email),
-      Phone: getValueBySelector(selectors.Phone),
-      Description: getValueBySelector(selectors.Description),
-      Interes: getValueBySelector(selectors.Interes),
-      'Landing Page': getValueBySelector(selectors['Landing Page']) || window.location.href,
-      'Page Title': getValueBySelector(selectors['Page Title']) || document.title,
-      'UTM polja': getValueBySelector(selectors['UTM polja']),
-      'Proizvod/Usluga': getValueBySelector(selectors['Proizvod/Usluga'])
+      Last_Name: getValueByRef(selectors.Last_Name),
+      First_Name: getValueByRef(selectors.First_Name),
+      Email: getValueByRef(selectors.Email),
+      Phone: getValueByRef(selectors.Phone),
+      Description: getValueByRef(selectors.Description),
+      Interes: getValueByRef(selectors.Interes),
+      'Landing Page': getValueByRef(selectors['Landing Page']) || window.location.href,
+      'Page Title': getValueByRef(selectors['Page Title']) || document.title,
+      'UTM polja': getValueByRef(selectors['UTM polja']),
+      'Proizvod/Usluga': getValueByRef(selectors['Proizvod/Usluga'])
     };
 
     if (!lead.Last_Name) {

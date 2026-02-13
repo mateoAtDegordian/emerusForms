@@ -80,14 +80,35 @@ Custom JS hook:
 
 ## WS Submit Integration (Existing WS Forms)
 
-You can send directly by field `#id` selectors (recommended for your case):
+You can send directly by field refs (raw ID like `351`, `#id`, or CSS selector):
 
 ```js
+function getByRef(ref) {
+  const value = String(ref || '').trim();
+  if (!value) return '';
+
+  if (value.startsWith('#')) {
+    const byHashId = document.getElementById(value.slice(1));
+    if (byHashId) return byHashId.value || '';
+  }
+
+  if (/^[A-Za-z0-9_-]+$/.test(value)) {
+    const byId = document.getElementById(value);
+    if (byId) return byId.value || '';
+  }
+
+  try {
+    return document.querySelector(value)?.value || '';
+  } catch {
+    return '';
+  }
+}
+
 var lead = {
-  Last_Name: document.querySelector('#PLACEHOLDER_FULL_NAME_ID')?.value || '',
-  Email: document.querySelector('#PLACEHOLDER_EMAIL_ID')?.value || '',
-  Phone: document.querySelector('#PLACEHOLDER_PHONE_ID')?.value || '',
-  Interes: document.querySelector('#PLACEHOLDER_INTEREST_ID')?.value || ''
+  Last_Name: getByRef('PLACEHOLDER_FULL_NAME_ID_OR_SELECTOR'),
+  Email: getByRef('PLACEHOLDER_EMAIL_ID_OR_SELECTOR'),
+  Phone: getByRef('PLACEHOLDER_PHONE_ID_OR_SELECTOR'),
+  Interes: getByRef('PLACEHOLDER_INTEREST_ID_OR_SELECTOR')
 };
 
 var rows = Object.keys(lead)
