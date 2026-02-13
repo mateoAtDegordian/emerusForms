@@ -17,7 +17,7 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 - WS default field values by page/variant:
   - Define rules in plugin settings
   - Auto-fill hidden/empty fields in WS Form
-  - Optional custom JS hook template
+  - Optional custom JS hook template (run only when enabled)
 - Zoho helper for WS forms already on page:
   - `window.EmerusZoho.sendWsForm(form, options)`
   - Does not require plugin-injected overlay form

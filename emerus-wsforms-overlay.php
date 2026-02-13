@@ -260,6 +260,7 @@ JS;
             'product_page_overrides'     => [],
             'product_page_texts'         => "", // page_id_or_slug|hr title|en title
             'ws_default_rules'           => '',
+            'ws_custom_js_enabled'       => 0,
             'ws_custom_js'               => $this->default_custom_js_template(),
             'overlay_max_width'          => 420,
             'global_context_enabled'     => 1,
@@ -321,6 +322,7 @@ JS;
             'product_page_overrides'     => $this->sanitize_page_overrides(isset($raw['product_page_overrides']) ? (array) $raw['product_page_overrides'] : []),
             'product_page_texts'         => isset($raw['product_page_texts']) ? sanitize_textarea_field($raw['product_page_texts']) : $defaults['product_page_texts'],
             'ws_default_rules'           => isset($raw['ws_default_rules']) ? sanitize_textarea_field($raw['ws_default_rules']) : $defaults['ws_default_rules'],
+            'ws_custom_js_enabled'       => !empty($raw['ws_custom_js_enabled']) ? 1 : 0,
             'ws_custom_js'               => isset($raw['ws_custom_js']) ? $this->sanitize_custom_js($raw['ws_custom_js']) : $defaults['ws_custom_js'],
             'overlay_max_width'          => isset($raw['overlay_max_width']) ? max(280, min(640, absint($raw['overlay_max_width']))) : $defaults['overlay_max_width'],
             'global_context_enabled'     => !empty($raw['global_context_enabled']) ? 1 : 0,
@@ -698,8 +700,13 @@ JS;
                     <tr>
                         <th scope="row"><label for="ws_custom_js">Custom JS hook (optional)</label></th>
                         <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_custom_js_enabled]" value="1" <?php checked((int) $options['ws_custom_js_enabled'], 1); ?> />
+                                Enable custom JS hook execution.
+                            </label>
+                            <br /><br />
                             <textarea id="ws_custom_js" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_custom_js]" rows="10" class="large-text code"><?php echo esc_textarea($options['ws_custom_js']); ?></textarea>
-                            <p class="description">Runs after plugin JS. You can listen to event <code>emerus-ws-defaults-applied</code> and adjust form behavior.</p>
+                            <p class="description">Runs after plugin JS only when enabled. You can listen to event <code>emerus-ws-defaults-applied</code> and adjust form behavior.</p>
                         </td>
                     </tr>
                 </table>
@@ -973,8 +980,9 @@ JS;
             ],
         ]);
 
+        $custom_js_enabled = (int) $options['ws_custom_js_enabled'] === 1;
         $custom_js = trim((string) $options['ws_custom_js']);
-        if ($custom_js !== '') {
+        if ($custom_js_enabled && $custom_js !== '') {
             $wrapped_custom_js = 'try { (new Function(' . wp_json_encode($custom_js) . '))(); } catch (e) { console.error("Emerus custom JS error:", e); }';
             wp_add_inline_script('emerus-wsforms-overlay', $wrapped_custom_js, 'after');
         }
