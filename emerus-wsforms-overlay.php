@@ -76,7 +76,8 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
 
 1) Add this script in WS Form submit custom JS action.
 2) Replace placeholders with your real field references.
-   You can use: raw ID (e.g. 351), #id, or any valid CSS selector.
+   Recommended: WS field IDs without # (e.g. 351, 352, 353...).
+3) Form key is auto-detected from current form; you can still override it manually.
 3) It sends both "rows" and "lead" JSON, same structure as your tested PHP format.
 */
 (async function () {
@@ -84,53 +85,111 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     return;
   }
 
-  var formKey = 'PLACEHOLDER_FORM_KEY'; // npr. "services_products_en"
+  var formVariant = 'product'; // hero or product
+  var manualFormKey = ''; // optional override, e.g. "services_products_en"
 
-  // Replace placeholders with your actual field refs (351, #field-id, .class, [name="x"]).
+  // Replace placeholders with your actual WS field refs (prefer numeric IDs like 351).
   // Remove keys you do not need.
-  var selectors = {
-    Last_Name: 'PLACEHOLDER_FULL_NAME_ID_OR_SELECTOR',
-    First_Name: 'PLACEHOLDER_FIRST_NAME_ID_OR_SELECTOR',
-    Email: 'PLACEHOLDER_EMAIL_ID_OR_SELECTOR',
-    Phone: 'PLACEHOLDER_PHONE_ID_OR_SELECTOR',
-    Description: 'PLACEHOLDER_DESCRIPTION_ID_OR_SELECTOR',
-    Interes: 'PLACEHOLDER_INTEREST_ID_OR_SELECTOR',
-    'Landing Page': 'PLACEHOLDER_LANDING_PAGE_ID_OR_SELECTOR',
-    'Page Title': 'PLACEHOLDER_PAGE_TITLE_ID_OR_SELECTOR',
-    'UTM polja': 'PLACEHOLDER_UTM_POLJA_ID_OR_SELECTOR',
-    'Proizvod/Usluga': 'PLACEHOLDER_PROIZVOD_USLUGA_ID_OR_SELECTOR'
+  var fieldRefs = {
+    Last_Name: 'PLACEHOLDER_LAST_NAME_FIELD_ID',
+    First_Name: 'PLACEHOLDER_FIRST_NAME_FIELD_ID',
+    Email: 'PLACEHOLDER_EMAIL_FIELD_ID',
+    Phone: 'PLACEHOLDER_PHONE_FIELD_ID',
+    Description: 'PLACEHOLDER_DESCRIPTION_FIELD_ID',
+    Interes: 'PLACEHOLDER_INTEREST_FIELD_ID',
+    'Landing Page': 'PLACEHOLDER_LANDING_PAGE_FIELD_ID',
+    'Page Title': 'PLACEHOLDER_PAGE_TITLE_FIELD_ID',
+    'UTM polja': 'PLACEHOLDER_UTM_FIELD_ID',
+    'Proizvod/Usluga': 'PLACEHOLDER_PRODUCT_FIELD_ID'
   };
 
-  function getElementByRef(ref) {
-    var value = String(ref || '').trim();
-    if (!value) {
+  function escapeSelectorValue(value) {
+    if (window.CSS && window.CSS.escape) {
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/"/g, '\\"');
+  }
+
+  function findInScope(scope, selector) {
+    if (!scope || !selector) {
       return null;
     }
-
-    if (value.charAt(0) === '#') {
-      var byHashId = document.getElementById(value.slice(1));
-      if (byHashId) {
-        return byHashId;
-      }
-    }
-
-    // WS often uses numeric IDs (e.g. 351), so try direct getElementById first.
-    if (/^[A-Za-z0-9_-]+$/.test(value)) {
-      var byId = document.getElementById(value);
-      if (byId) {
-        return byId;
-      }
-    }
-
     try {
-      return document.querySelector(value);
+      return scope.querySelector(selector);
     } catch (e) {
       return null;
     }
   }
 
-  function getValueByRef(ref) {
-    var el = getElementByRef(ref);
+  function getElementByRef(ref, formEl) {
+    var value = String(ref || '').trim();
+    if (!value) {
+      return null;
+    }
+
+    var scopes = [];
+    if (formEl) {
+      scopes.push(formEl);
+    }
+    scopes.push(document);
+
+    for (var i = 0; i < scopes.length; i += 1) {
+      var scope = scopes[i];
+      var el = null;
+
+      // Numeric refs map to WS input names: field_351
+      if (/^\d+$/.test(value)) {
+        el = findInScope(scope, '[name="field_' + value + '"]');
+        if (el) {
+          return el;
+        }
+      }
+
+      // #351 should also map to field_351
+      if (value.charAt(0) === '#' && /^\d+$/.test(value.slice(1))) {
+        el = findInScope(scope, '[name="field_' + value.slice(1) + '"]');
+        if (el) {
+          return el;
+        }
+      }
+
+      // field_351 by name
+      if (/^field_\d+$/.test(value)) {
+        el = findInScope(scope, '[name="' + value + '"]');
+        if (el) {
+          return el;
+        }
+      }
+
+      el = findInScope(scope, value);
+      if (el) {
+        return el;
+      }
+
+      if (value.charAt(0) !== '#') {
+        el = findInScope(scope, '[name="' + value.replace(/"/g, '\\"') + '"]');
+        if (el) {
+          return el;
+        }
+        el = findInScope(scope, '#' + escapeSelectorValue(value));
+        if (el) {
+          return el;
+        }
+      }
+    }
+
+    if (value.charAt(0) === '#') {
+      return document.getElementById(value.slice(1));
+    }
+    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) {
+      return document.getElementById(value);
+    }
+
+    return null;
+  }
+
+  function getValueByRef(ref, formEl) {
+    var el = getElementByRef(ref, formEl);
     if (!el) {
       return '';
     }
@@ -145,10 +204,10 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     if (type === 'radio') {
       var checked = null;
       if (el.name) {
-        try {
-          checked = document.querySelector('input[type=\"radio\"][name=\"' + (window.CSS && window.CSS.escape ? window.CSS.escape(el.name) : el.name) + '\"]:checked');
-        } catch (e) {
-          checked = null;
+        var radioSelector = 'input[type="radio"][name="' + escapeSelectorValue(el.name) + '"]:checked';
+        checked = findInScope(formEl || document, radioSelector);
+        if (!checked) {
+          checked = findInScope(document, radioSelector);
         }
       }
       return checked ? String(checked.value || '').trim() : '';
@@ -161,18 +220,80 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     return String(el.value || '').trim();
   }
 
+  function detectFormByRefs() {
+    var keys = Object.keys(fieldRefs);
+    for (var i = 0; i < keys.length; i += 1) {
+      var el = getElementByRef(fieldRefs[keys[i]], null);
+      if (el && el.closest) {
+        var form = el.closest('form');
+        if (form) {
+          return form;
+        }
+      }
+    }
+    return null;
+  }
+
+  function resolveCurrentForm() {
+    // WS Form often exposes global form id in action context.
+    if (typeof window.wsf_form_id !== 'undefined') {
+      var byWsfId = document.getElementById('ws-form-' + String(window.wsf_form_id));
+      if (byWsfId) {
+        return byWsfId;
+      }
+    }
+
+    if (typeof window.form_id !== 'undefined') {
+      var byFormId = document.getElementById('ws-form-' + String(window.form_id));
+      if (byFormId) {
+        return byFormId;
+      }
+    }
+
+    var byRefs = detectFormByRefs();
+    if (byRefs) {
+      return byRefs;
+    }
+
+    return document.querySelector('form.wsf-form') || document.querySelector('form');
+  }
+
+  function inferFormKey(formEl) {
+    var override = String(manualFormKey || '').trim();
+    if (override) {
+      return override;
+    }
+
+    if (!formEl) {
+      return '';
+    }
+
+    var explicit = String(formEl.getAttribute('data-form-key') || '').trim();
+    if (explicit) {
+      return explicit;
+    }
+
+    var dataId = String(formEl.getAttribute('data-id') || '').trim();
+    if (dataId) {
+      return 'ws_form_' + dataId;
+    }
+
+    return String(formEl.id || '').trim();
+  }
+
   try {
+    var formEl = resolveCurrentForm();
     var lead = {
-      Last_Name: getValueByRef(selectors.Last_Name),
-      First_Name: getValueByRef(selectors.First_Name),
-      Email: getValueByRef(selectors.Email),
-      Phone: getValueByRef(selectors.Phone),
-      Description: getValueByRef(selectors.Description),
-      Interes: getValueByRef(selectors.Interes),
-      'Landing Page': getValueByRef(selectors['Landing Page']) || window.location.href,
-      'Page Title': getValueByRef(selectors['Page Title']) || document.title,
-      'UTM polja': getValueByRef(selectors['UTM polja']),
-      'Proizvod/Usluga': getValueByRef(selectors['Proizvod/Usluga'])
+      Last_Name: getValueByRef(fieldRefs.Last_Name, formEl),
+      First_Name: getValueByRef(fieldRefs.First_Name, formEl),
+      Email: getValueByRef(fieldRefs.Email, formEl),
+      Phone: getValueByRef(fieldRefs.Phone, formEl),
+      Description: getValueByRef(fieldRefs.Description, formEl),
+      Interes: getValueByRef(fieldRefs.Interes, formEl),
+      'Landing Page': getValueByRef(fieldRefs['Landing Page'], formEl) || window.location.href,
+      'Page Title': getValueByRef(fieldRefs['Page Title'], formEl) || document.title,
+      'UTM polja': getValueByRef(fieldRefs['UTM polja'], formEl),
+      'Proizvod/Usluga': getValueByRef(fieldRefs['Proizvod/Usluga'], formEl)
     };
 
     if (!lead.Last_Name) {
@@ -188,8 +309,8 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     });
 
     await window.EmerusZoho.sendLead({
-      form_variant: 'product', // hero or product
-      form_key: formKey,
+      form_variant: formVariant,
+      form_key: inferFormKey(formEl),
       page_url: window.location.href,
       page_title: document.title,
       rows: rows,

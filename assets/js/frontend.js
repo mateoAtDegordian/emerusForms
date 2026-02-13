@@ -474,6 +474,11 @@
       return explicit;
     }
 
+    var dataId = asString(form.getAttribute('data-id') || '');
+    if (dataId) {
+      return 'ws_form_' + dataId;
+    }
+
     if (form.id) {
       return asString(form.id);
     }
