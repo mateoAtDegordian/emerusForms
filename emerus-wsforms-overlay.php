@@ -72,13 +72,13 @@ JS;
     private function ws_integration_template() {
         return <<<'JS'
 /*
-WS Form custom JS example (for forms already placed on page, not injected by plugin):
+WS Form custom JS example using OFFICIAL WS variables (Actions scope):
+https://wsform.com/knowledgebase/variables/#field
 
-1) Add this script in WS Form submit custom JS action.
-2) Replace placeholders with your real field references.
-   Recommended: WS field IDs without # (e.g. 351, 352, 353...).
-3) Form key is auto-detected from current form; you can still override it manually.
-3) It sends both "rows" and "lead" JSON, same structure as your tested PHP format.
+1) Add this script to WS Form Action -> Run JavaScript.
+2) Replace placeholder field IDs inside #field(...).
+3) Keep this action early in order (before message / redirects).
+4) For payload preview only set dryRun = true.
 */
 (async function () {
   if (!window.EmerusZoho || !window.EmerusZoho.sendLead) {
@@ -86,236 +86,198 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
   }
 
   var formVariant = 'product'; // hero or product
-  var manualFormKey = ''; // optional override, e.g. "services_products_en"
+  var manualFormKey = ''; // optional override, e.g. services_products_en
+  var dryRun = false; // true = log payload only
+  var customInterestValue = ''; // optional hard override (if set, always used as fallback)
 
-  // Replace placeholders with your actual WS field refs (prefer numeric IDs like 351).
+  // Explicit slug rules: both HR and EN URLs map to HR Zoho values.
+  var interestPathRules = [
+    { slug: '/hr/industrijski-profili/', value: 'Industrijski profili' },
+    { slug: '/industrial-profiles/', value: 'Industrijski profili' },
+    { slug: '/hr/solarni-sustavi/', value: 'Solarni sustavi' },
+    { slug: '/solar-systems/', value: 'Solarni sustavi' },
+    { slug: '/hr/gradevinski-sustavi/', value: 'Građevinski sustavi' },
+    { slug: '/building-systems/', value: 'Građevinski sustavi' }
+  ];
+
+  // Replace placeholders with WS field IDs from builder (e.g. 351, 352, 353...).
   // Remove keys you do not need.
-  var fieldRefs = {
-    Last_Name: 'PLACEHOLDER_LAST_NAME_FIELD_ID',
-    First_Name: 'PLACEHOLDER_FIRST_NAME_FIELD_ID',
-    Email: 'PLACEHOLDER_EMAIL_FIELD_ID',
-    Phone: 'PLACEHOLDER_PHONE_FIELD_ID',
-    Description: 'PLACEHOLDER_DESCRIPTION_FIELD_ID',
-    Interes: 'PLACEHOLDER_INTEREST_FIELD_ID',
-    'Landing Page': 'PLACEHOLDER_LANDING_PAGE_FIELD_ID',
-    'Page Title': 'PLACEHOLDER_PAGE_TITLE_FIELD_ID',
-    'UTM polja': 'PLACEHOLDER_UTM_FIELD_ID',
-    'Proizvod/Usluga': 'PLACEHOLDER_PRODUCT_FIELD_ID'
+  var lead = {
+    Last_Name: '#field(PLACEHOLDER_LAST_NAME_FIELD_ID)',
+    First_Name: '#field(PLACEHOLDER_FIRST_NAME_FIELD_ID)',
+    Email: '#field(PLACEHOLDER_EMAIL_FIELD_ID)',
+    Phone: '#field(PLACEHOLDER_PHONE_FIELD_ID)',
+    Description: '#field(PLACEHOLDER_DESCRIPTION_FIELD_ID)',
+    Interes: '#field(PLACEHOLDER_INTEREST_FIELD_ID, ", ")',
+    'Proizvod/Usluga': '#field(PLACEHOLDER_PRODUCT_FIELD_ID, ", ")',
+    'Landing Page': '#tracking_url',
+    'Page Title': '#post_title',
+    'UTM polja': 'utm_source=#tracking_utm_source&utm_medium=#tracking_utm_medium&utm_campaign=#tracking_utm_campaign&utm_term=#tracking_utm_term&utm_content=#tracking_utm_content'
   };
 
-  function escapeSelectorValue(value) {
-    if (window.CSS && window.CSS.escape) {
-      return window.CSS.escape(value);
-    }
-    return String(value).replace(/"/g, '\\"');
+  function norm(value) {
+    return String(value || '').trim();
   }
 
-  function findInScope(scope, selector) {
-    if (!scope || !selector) {
-      return null;
-    }
-    try {
-      return scope.querySelector(selector);
-    } catch (e) {
-      return null;
-    }
+  function isUnparsedVariable(value) {
+    var v = norm(value);
+    return /^#[a-z_]+(\(|$)/i.test(v);
   }
 
-  function getElementByRef(ref, formEl) {
-    var value = String(ref || '').trim();
-    if (!value) {
-      return null;
-    }
-
-    var scopes = [];
-    if (formEl) {
-      scopes.push(formEl);
-    }
-    scopes.push(document);
-
-    for (var i = 0; i < scopes.length; i += 1) {
-      var scope = scopes[i];
-      var el = null;
-
-      // Numeric refs map to WS input names: field_351
-      if (/^\d+$/.test(value)) {
-        el = findInScope(scope, '[name="field_' + value + '"]');
-        if (el) {
-          return el;
-        }
-      }
-
-      // #351 should also map to field_351
-      if (value.charAt(0) === '#' && /^\d+$/.test(value.slice(1))) {
-        el = findInScope(scope, '[name="field_' + value.slice(1) + '"]');
-        if (el) {
-          return el;
-        }
-      }
-
-      // field_351 by name
-      if (/^field_\d+$/.test(value)) {
-        el = findInScope(scope, '[name="' + value + '"]');
-        if (el) {
-          return el;
-        }
-      }
-
-      el = findInScope(scope, value);
-      if (el) {
-        return el;
-      }
-
-      if (value.charAt(0) !== '#') {
-        el = findInScope(scope, '[name="' + value.replace(/"/g, '\\"') + '"]');
-        if (el) {
-          return el;
-        }
-        el = findInScope(scope, '#' + escapeSelectorValue(value));
-        if (el) {
-          return el;
-        }
-      }
-    }
-
-    if (value.charAt(0) === '#') {
-      return document.getElementById(value.slice(1));
-    }
-    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) {
-      return document.getElementById(value);
-    }
-
-    return null;
-  }
-
-  function getValueByRef(ref, formEl) {
-    var el = getElementByRef(ref, formEl);
-    if (!el) {
+  function cleanupValue(value) {
+    var v = norm(value);
+    if (!v) {
       return '';
     }
-
-    var tag = (el.tagName || '').toLowerCase();
-    var type = (el.type || '').toLowerCase();
-
-    if (type === 'checkbox') {
-      return el.checked ? '1' : '0';
+    if (v.indexOf('PLACEHOLDER_') !== -1) {
+      return '';
     }
-
-    if (type === 'radio') {
-      var checked = null;
-      if (el.name) {
-        var radioSelector = 'input[type="radio"][name="' + escapeSelectorValue(el.name) + '"]:checked';
-        checked = findInScope(formEl || document, radioSelector);
-        if (!checked) {
-          checked = findInScope(document, radioSelector);
-        }
-      }
-      return checked ? String(checked.value || '').trim() : '';
+    if (isUnparsedVariable(v)) {
+      return '';
     }
-
-    if (tag === 'select') {
-      return String(el.value || '').trim();
-    }
-
-    return String(el.value || '').trim();
+    return v;
   }
 
-  function detectFormByRefs() {
-    var keys = Object.keys(fieldRefs);
-    for (var i = 0; i < keys.length; i += 1) {
-      var el = getElementByRef(fieldRefs[keys[i]], null);
-      if (el && el.closest) {
-        var form = el.closest('form');
-        if (form) {
-          return form;
-        }
-      }
+  function cleanupUtm(serialized) {
+    var raw = cleanupValue(serialized);
+    if (!raw) {
+      return '';
     }
-    return null;
+    var parts = raw.split('&');
+    var out = [];
+    for (var i = 0; i < parts.length; i += 1) {
+      var part = norm(parts[i]);
+      if (!part) {
+        continue;
+      }
+      var kv = part.split('=');
+      var key = norm(kv[0]);
+      var val = kv.length > 1 ? norm(kv.slice(1).join('=')) : '';
+      if (!key || !val || val.charAt(0) === '#') {
+        continue;
+      }
+      out.push(key + '=' + val);
+    }
+    return out.join('&');
   }
 
-  function resolveCurrentForm() {
-    // WS Form often exposes global form id in action context.
-    if (typeof window.wsf_form_id !== 'undefined') {
-      var byWsfId = document.getElementById('ws-form-' + String(window.wsf_form_id));
-      if (byWsfId) {
-        return byWsfId;
-      }
+  function inferFormKey() {
+    var manual = cleanupValue(manualFormKey);
+    if (manual) {
+      return manual;
     }
 
-    if (typeof window.form_id !== 'undefined') {
-      var byFormId = document.getElementById('ws-form-' + String(window.form_id));
-      if (byFormId) {
-        return byFormId;
-      }
-    }
+    // WS variables (Actions scope)
+    var formId = cleanupValue('#form_id');
+    var formLabel = cleanupValue('#form_label');
 
-    var byRefs = detectFormByRefs();
-    if (byRefs) {
-      return byRefs;
+    if (/^\d+$/.test(formId)) {
+      return 'ws_form_' + formId;
     }
-
-    return document.querySelector('form.wsf-form') || document.querySelector('form');
+    if (formLabel) {
+      return formLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+    return '';
   }
 
-  function inferFormKey(formEl) {
-    var override = String(manualFormKey || '').trim();
+  function normalizePath(value) {
+    var path = norm(value).toLowerCase();
+    if (!path) {
+      return '/';
+    }
+    if (path.charAt(0) !== '/') {
+      path = '/' + path;
+    }
+    path = path.replace(/\/+/g, '/');
+    if (path.length > 1 && path.charAt(path.length - 1) === '/') {
+      path = path.slice(0, -1);
+    }
+    return path;
+  }
+
+  function pathMatchesRule(path, slug) {
+    var current = normalizePath(path);
+    var rule = normalizePath(slug);
+    if (!rule || rule === '/') {
+      return false;
+    }
+    return current === rule || current.indexOf(rule + '/') === 0;
+  }
+
+  function inferInterestFromPath() {
+    var override = cleanupValue(customInterestValue);
     if (override) {
       return override;
     }
 
-    if (!formEl) {
+    var path = '';
+    try {
+      path = norm(window.location.pathname).toLowerCase();
+    } catch (e) {
+      path = '';
+    }
+    if (!path) {
       return '';
     }
 
-    var explicit = String(formEl.getAttribute('data-form-key') || '').trim();
-    if (explicit) {
-      return explicit;
+    for (var i = 0; i < interestPathRules.length; i += 1) {
+      var rule = interestPathRules[i] || {};
+      if (pathMatchesRule(path, rule.slug || '')) {
+        return cleanupValue(rule.value || '');
+      }
     }
 
-    var dataId = String(formEl.getAttribute('data-id') || '').trim();
-    if (dataId) {
-      return 'ws_form_' + dataId;
-    }
-
-    return String(formEl.id || '').trim();
+    return '';
   }
 
   try {
-    var formEl = resolveCurrentForm();
-    var lead = {
-      Last_Name: getValueByRef(fieldRefs.Last_Name, formEl),
-      First_Name: getValueByRef(fieldRefs.First_Name, formEl),
-      Email: getValueByRef(fieldRefs.Email, formEl),
-      Phone: getValueByRef(fieldRefs.Phone, formEl),
-      Description: getValueByRef(fieldRefs.Description, formEl),
-      Interes: getValueByRef(fieldRefs.Interes, formEl),
-      'Landing Page': getValueByRef(fieldRefs['Landing Page'], formEl) || window.location.href,
-      'Page Title': getValueByRef(fieldRefs['Page Title'], formEl) || document.title,
-      'UTM polja': getValueByRef(fieldRefs['UTM polja'], formEl),
-      'Proizvod/Usluga': getValueByRef(fieldRefs['Proizvod/Usluga'], formEl)
-    };
+    var finalLead = {};
+    var keys = Object.keys(lead);
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      var value = key === 'UTM polja' ? cleanupUtm(lead[key]) : cleanupValue(lead[key]);
+      finalLead[key] = value;
+    }
 
-    if (!lead.Last_Name) {
-      lead.Last_Name = 'Website Lead';
+    if (!finalLead.Interes) {
+      finalLead.Interes = inferInterestFromPath();
+    }
+    if (!finalLead['Proizvod/Usluga'] && finalLead.Interes) {
+      finalLead['Proizvod/Usluga'] = finalLead.Interes;
+    }
+
+    if (!finalLead.Last_Name) {
+      finalLead.Last_Name = 'Website Lead';
     }
 
     var rows = [];
-    Object.keys(lead).forEach(function (key) {
-      var value = String(lead[key] || '');
+    Object.keys(finalLead).forEach(function (key) {
+      var value = String(finalLead[key] || '');
       if (value.trim() !== '') {
         rows.push({ k: key, v: value });
       }
     });
 
-    await window.EmerusZoho.sendLead({
+    var payload = {
       form_variant: formVariant,
-      form_key: inferFormKey(formEl),
-      page_url: window.location.href,
-      page_title: document.title,
+      form_key: inferFormKey(),
+      page_url: cleanupValue('#tracking_url') || window.location.href,
+      page_title: cleanupValue('#post_title') || document.title,
       rows: rows,
-      lead: lead
+      lead: finalLead
+    };
+
+    console.log('Emerus payload preview', {
+      formId: cleanupValue('#form_id'),
+      formLabel: cleanupValue('#form_label'),
+      payload: payload
     });
+
+    if (dryRun) {
+      return;
+    }
+
+    await window.EmerusZoho.sendLead(payload);
   } catch (error) {
     console.error('Zoho integration failed:', error);
   }
@@ -381,6 +343,8 @@ JS;
             'product_page_overrides'     => [],
             'product_page_texts'         => "", // page_id_or_slug|hr title|en title
             'ws_default_rules'           => '',
+            'ws_i18n_enabled'            => 0,
+            'ws_i18n_rules'              => '',
             'ws_custom_js_enabled'       => 0,
             'ws_custom_js'               => $this->default_custom_js_template(),
             'overlay_max_width'          => 420,
@@ -443,6 +407,8 @@ JS;
             'product_page_overrides'     => $this->sanitize_page_overrides(isset($raw['product_page_overrides']) ? (array) $raw['product_page_overrides'] : []),
             'product_page_texts'         => isset($raw['product_page_texts']) ? sanitize_textarea_field($raw['product_page_texts']) : $defaults['product_page_texts'],
             'ws_default_rules'           => isset($raw['ws_default_rules']) ? sanitize_textarea_field($raw['ws_default_rules']) : $defaults['ws_default_rules'],
+            'ws_i18n_enabled'            => !empty($raw['ws_i18n_enabled']) ? 1 : 0,
+            'ws_i18n_rules'              => isset($raw['ws_i18n_rules']) ? sanitize_textarea_field($raw['ws_i18n_rules']) : $defaults['ws_i18n_rules'],
             'ws_custom_js_enabled'       => !empty($raw['ws_custom_js_enabled']) ? 1 : 0,
             'ws_custom_js'               => isset($raw['ws_custom_js']) ? $this->sanitize_custom_js($raw['ws_custom_js']) : $defaults['ws_custom_js'],
             'overlay_max_width'          => isset($raw['overlay_max_width']) ? max(280, min(640, absint($raw['overlay_max_width']))) : $defaults['overlay_max_width'],
@@ -819,6 +785,23 @@ JS;
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="ws_i18n_rules">WS #text translation rules</label></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_i18n_enabled]" value="1" <?php checked((int) $options['ws_i18n_enabled'], 1); ?> />
+                                Enable HR/EN translation injection for WS hidden text fields.
+                            </label>
+                            <br /><br />
+                            <textarea id="ws_i18n_rules" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_i18n_rules]" rows="7" class="large-text code"><?php echo esc_textarea($options['ws_i18n_rules']); ?></textarea>
+                            <p class="description">One rule per line: <code>match_key_or_text|hr_value|en_value</code></p>
+                            <p class="description">Examples: <code>i18n_full_name_label|Puno ime|Full name</code> or <code>Full name|Puno ime|Full name</code></p>
+                            <p class="description">Simple mode (no hidden source fields): write token directly in WS text (Label/Placeholder/Help/Button), e.g. <code>i18n_full_name_label</code>, <code>[[i18n_full_name_label]]</code>, or <code>{{i18n_full_name_label}}</code>. Plugin auto-replaces by current language.</p>
+                            <p class="description">ENG-as-key mode: put exact English text as first column (e.g. <code>Full name</code>) and plugin will auto-replace to HR only when needed.</p>
+                            <p class="description">In WS Form you can also use official variable in Label/Placeholder/Help Text: <code>#text(#field(123))</code>, where 123 is hidden source field ID and that hidden field Name matches first column key.</p>
+                            <p class="description">Reference: <a href="https://wsform.com/knowledgebase/dynamic-label-placeholder-and-help-text-with-text/" target="_blank" rel="noopener noreferrer">Dynamic Label, Placeholder and Help Text With #text</a></p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="ws_custom_js">Custom JS hook (optional)</label></th>
                         <td>
                             <label>
@@ -1005,6 +988,7 @@ JS;
                                 <li><code>mapFields</code>: map form field names to Zoho API names</li>
                                 <li><code>staticLead</code>: extra fixed lead data always appended</li>
                                 <li><code>extraPayload</code>: extra top-level payload values</li>
+                                <li><code>applyI18n</code>: apply plugin WS #text translation rules before collecting values (default <code>true</code>)</li>
                             </ul>
                             <p class="description"><code>Lead_Source</code> is filled automatically from plugin settings (typically <code>Website</code>).</p>
                             <p class="description">Global injection (from plugin options) can auto-add <code>Landing Page</code>, <code>Page Title</code>, and <code>UTM polja</code> without WS form fields.</p>
@@ -1050,7 +1034,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.2'
+                '0.3.3'
             );
         }
 
@@ -1058,7 +1042,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.2',
+            '0.3.3',
             true
         );
 
@@ -1084,6 +1068,10 @@ JS;
             'parentPageId'   => $parent_id,
             'parentPageSlug' => $parent_slug,
             'wsDefaultRules' => $this->parse_ws_default_rules((string) $options['ws_default_rules']),
+            'wsI18n'         => [
+                'enabled' => (int) $options['ws_i18n_enabled'] === 1,
+                'rules'   => $this->parse_ws_i18n_rules((string) $options['ws_i18n_rules']),
+            ],
             'globalContext'  => [
                 'enabled'         => (int) $options['global_context_enabled'] === 1,
                 'landingField'    => (string) $options['context_landing_field_api'],
@@ -1386,6 +1374,37 @@ JS;
                 'field'   => $field,
                 'value'   => sanitize_text_field((string) $parts[2]),
                 'variant' => $variant,
+            ];
+        }
+
+        return $rules;
+    }
+
+    private function parse_ws_i18n_rules($rules_text) {
+        $lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $rules_text)));
+        $rules = [];
+
+        foreach ($lines as $line) {
+            $parts = array_map('trim', explode('|', $line, 3));
+            if (count($parts) < 3) {
+                continue;
+            }
+
+            $field = trim(sanitize_text_field((string) $parts[0]));
+            if ($field === '') {
+                continue;
+            }
+
+            $hr = sanitize_text_field((string) $parts[1]);
+            $en = sanitize_text_field((string) $parts[2]);
+            if ($hr === '' && $en === '') {
+                continue;
+            }
+
+            $rules[] = [
+                'field' => $field,
+                'hr'    => $hr,
+                'en'    => $en,
             ];
         }
 

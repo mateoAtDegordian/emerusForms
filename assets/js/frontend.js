@@ -12,6 +12,10 @@
     return String(value).replace(/([ #;?%&,.+*~':"!^$\[\]()=>|/@])/g, '\\$1');
   }
 
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   function asString(value) {
     if (value === null || typeof value === 'undefined') {
       return '';
@@ -245,6 +249,161 @@
     return defaults;
   }
 
+  function getCurrentLangCode() {
+    var lang = asString(config.lang || '').toLowerCase();
+    if (lang.indexOf('hr') === 0) {
+      return 'hr';
+    }
+    if (lang.indexOf('en') === 0) {
+      return 'en';
+    }
+    return 'en';
+  }
+
+  function resolveI18nValue(rule) {
+    if (!rule || typeof rule !== 'object') {
+      return '';
+    }
+
+    var key = asString(rule.field || '').trim();
+    var hr = asString(rule.hr || '').trim();
+    var en = asString(rule.en || '').trim();
+    var lang = getCurrentLangCode();
+
+    if (lang === 'hr') {
+      return hr || en || key;
+    }
+
+    return en || key || hr;
+  }
+
+  function replaceI18nTokens(rawText, valuesMap) {
+    var text = asString(rawText);
+    if (text === '') {
+      return text;
+    }
+
+    var map = valuesMap && typeof valuesMap === 'object' ? valuesMap : {};
+    var keys = Object.keys(map);
+    if (keys.length === 0) {
+      return text;
+    }
+
+    var out = text;
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = asString(keys[i] || '').trim();
+      var translated = asString(map[key] || '').trim();
+      if (!key || !translated) {
+        continue;
+      }
+
+      // Explicit token forms: [[token]] and {{token}}
+      out = out.replace(new RegExp('\\[\\[' + escapeRegExp(key) + '\\]\\]', 'g'), translated);
+      out = out.replace(new RegExp('\\{\\{\\s*' + escapeRegExp(key) + '\\s*\\}\\}', 'g'), translated);
+    }
+
+    var trimmed = out.trim();
+    if (trimmed && Object.prototype.hasOwnProperty.call(map, trimmed)) {
+      var replacement = asString(map[trimmed] || '').trim();
+      if (replacement) {
+        var leadingMatch = out.match(/^\s*/);
+        var trailingMatch = out.match(/\s*$/);
+        var leading = leadingMatch ? leadingMatch[0] : '';
+        var trailing = trailingMatch ? trailingMatch[0] : '';
+        out = leading + replacement + trailing;
+      }
+    }
+
+    return out;
+  }
+
+  function getI18nRoots(container) {
+    var roots = [];
+    var target = container && container.querySelectorAll ? container : document;
+
+    if (container && container.nodeType === 1 && (container.tagName || '').toLowerCase() === 'form') {
+      roots.push(container);
+    }
+
+    var found = target.querySelectorAll('form.wsf-form, form[id^="ws-form-"]');
+    for (var i = 0; i < found.length; i += 1) {
+      if (roots.indexOf(found[i]) === -1) {
+        roots.push(found[i]);
+      }
+    }
+
+    if (roots.length === 0 && target === document) {
+      roots.push(document.body || document.documentElement || document);
+    }
+
+    return roots;
+  }
+
+  function applyI18nTextTokens(container, valuesMap) {
+    var roots = getI18nRoots(container);
+    if (roots.length === 0) {
+      return 0;
+    }
+
+    var changedCount = 0;
+    var attrNames = ['placeholder', 'title', 'aria-label', 'data-label', 'data-placeholder'];
+
+    for (var i = 0; i < roots.length; i += 1) {
+      var rootNode = roots[i];
+      if (!rootNode) {
+        continue;
+      }
+
+      var walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT, null);
+      var textNode;
+      while ((textNode = walker.nextNode())) {
+        if (!textNode || !textNode.nodeValue) {
+          continue;
+        }
+        var originalText = textNode.nodeValue;
+        var replacedText = replaceI18nTokens(originalText, valuesMap);
+        if (replacedText !== originalText) {
+          textNode.nodeValue = replacedText;
+          changedCount += 1;
+        }
+      }
+
+      var attrsNodes = rootNode.querySelectorAll('*');
+      for (var j = 0; j < attrsNodes.length; j += 1) {
+        var el = attrsNodes[j];
+        if (!el || !el.getAttribute) {
+          continue;
+        }
+
+        for (var k = 0; k < attrNames.length; k += 1) {
+          var attr = attrNames[k];
+          if (!el.hasAttribute(attr)) {
+            continue;
+          }
+          var originalAttr = asString(el.getAttribute(attr) || '');
+          var replacedAttr = replaceI18nTokens(originalAttr, valuesMap);
+          if (replacedAttr !== originalAttr) {
+            el.setAttribute(attr, replacedAttr);
+            changedCount += 1;
+          }
+        }
+
+        var tagName = asString(el.tagName).toLowerCase();
+        var type = asString(el.type).toLowerCase();
+        if (tagName === 'input' && (type === 'submit' || type === 'button' || type === 'reset')) {
+          var originalValue = asString(el.value || '');
+          var replacedValue = replaceI18nTokens(originalValue, valuesMap);
+          if (replacedValue !== originalValue) {
+            el.value = replacedValue;
+            changedCount += 1;
+          }
+        }
+      }
+    }
+
+    return changedCount;
+  }
+
   function getMatchingFields(container, fieldName) {
     if (!container || !fieldName) {
       return [];
@@ -393,6 +552,96 @@
 
     setTimeout(function () {
       applyDefaultsWithRetry(formOrSelector, options, currentAttempt + 1);
+    }, 160);
+  }
+
+  function getI18nRules() {
+    var i18nConfig = config.wsI18n && typeof config.wsI18n === 'object' ? config.wsI18n : {};
+    if (!i18nConfig.enabled || !Array.isArray(i18nConfig.rules)) {
+      return [];
+    }
+    return i18nConfig.rules;
+  }
+
+  function applyI18nToContainer(container, options) {
+    var target = container && container.querySelectorAll ? container : document;
+    var opts = options || {};
+    var allowOverwrite = !!opts.overwrite;
+    var rules = getI18nRules();
+    var appliedCount = 0;
+    var resolved = {};
+
+    for (var i = 0; i < rules.length; i += 1) {
+      var rule = rules[i];
+      var fieldName = asString(rule && rule.field ? rule.field : '').trim();
+      if (!fieldName) {
+        continue;
+      }
+
+      var value = resolveI18nValue(rule);
+      if (value === '') {
+        continue;
+      }
+
+      resolved[fieldName] = value;
+      var fields = getMatchingFields(target, fieldName);
+      for (var j = 0; j < fields.length; j += 1) {
+        if (setFieldValue(fields[j], value, allowOverwrite)) {
+          appliedCount += 1;
+        }
+      }
+    }
+
+    // Also support direct token usage in WS labels/placeholders/help/buttons:
+    // i18n_key, [[i18n_key]], or {{i18n_key}}
+    var tokenChanges = applyI18nTextTokens(target, resolved);
+    appliedCount += tokenChanges;
+
+    return {
+      values: resolved,
+      lang: getCurrentLangCode(),
+      appliedCount: appliedCount
+    };
+  }
+
+  function emitI18nEvent(result) {
+    if (typeof window.CustomEvent !== 'function') {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('emerus-ws-i18n-applied', {
+      detail: {
+        lang: result.lang || getCurrentLangCode(),
+        values: result.values || {},
+        appliedCount: result.appliedCount || 0
+      }
+    }));
+  }
+
+  function applyI18n(formOrSelector, options) {
+    var container = resolveFormElement(formOrSelector);
+    var result = applyI18nToContainer(container || document, options || {});
+    config.resolvedI18n = result.values || {};
+    window.EmerusWsFormsOverlay = config;
+    emitI18nEvent(result);
+    return result;
+  }
+
+  function applyI18nWithRetry(formOrSelector, options, attempt) {
+    var maxAttempts = 30;
+    var currentAttempt = attempt || 0;
+    var rules = getI18nRules();
+    if (rules.length === 0) {
+      return;
+    }
+
+    var result = applyI18n(formOrSelector, options || {});
+    if ((result.appliedCount > 0) || currentAttempt >= maxAttempts) {
+      return;
+    }
+
+    setTimeout(function () {
+      applyI18nWithRetry(formOrSelector, options || {}, currentAttempt + 1);
     }, 160);
   }
 
@@ -808,6 +1057,9 @@
     if (opts.applyDefaults !== false) {
       applyDefaultsWithRetry(form, { variant: variant, overwrite: !!opts.overwriteDefaults }, 0);
     }
+    if (opts.applyI18n !== false) {
+      applyI18nWithRetry(form, { overwrite: !!opts.overwriteI18n }, 0);
+    }
 
     var pairs = collectPairsFromForm(form, {
       includeEmpty: !!opts.includeEmpty,
@@ -859,6 +1111,20 @@
     return applyDefaults(formOrSelector, options || {});
   };
 
+  config.getResolvedI18n = function () {
+    var values = config.resolvedI18n && typeof config.resolvedI18n === 'object' ? config.resolvedI18n : {};
+    var copy = {};
+    var keys = Object.keys(values);
+    for (var i = 0; i < keys.length; i += 1) {
+      copy[keys[i]] = values[keys[i]];
+    }
+    return copy;
+  };
+
+  config.applyI18n = function (formOrSelector, options) {
+    return applyI18n(formOrSelector, options || {});
+  };
+
   window.EmerusWsFormsOverlay = config;
 
   window.EmerusZoho = {
@@ -868,6 +1134,9 @@
     sendWsForm: sendWsForm,
     applyDefaults: function (formOrSelector, options) {
       return applyDefaults(formOrSelector, options || {});
+    },
+    applyI18n: function (formOrSelector, options) {
+      return applyI18n(formOrSelector, options || {});
     },
     collectRows: function (formOrSelector, options) {
       var form = resolveFormElement(formOrSelector);
@@ -887,6 +1156,8 @@
     }
   };
 
+  var wsI18nEnabled = getI18nRules().length > 0;
+
   if (root) {
     var maxWidth = parseInt(root.getAttribute('data-max-width') || config.maxWidth || 420, 10);
     if (!Number.isFinite(maxWidth)) {
@@ -896,27 +1167,45 @@
 
     placeOverlay();
     applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+  }
 
-    var refreshPlacement = debounce(function () {
+  if (wsI18nEnabled) {
+    applyI18nWithRetry(null, { overwrite: false }, 0);
+  }
+
+  var refreshPlacement = debounce(function () {
+    if (root) {
       placeOverlay();
       applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
-    }, 120);
+    }
+    if (wsI18nEnabled) {
+      applyI18nWithRetry(null, { overwrite: false }, 0);
+    }
+  }, 120);
 
-    window.addEventListener('load', refreshPlacement);
+  window.addEventListener('load', refreshPlacement);
+  if (root) {
     window.addEventListener('resize', refreshPlacement);
-
     if (typeof mobileQuery.addEventListener === 'function') {
       mobileQuery.addEventListener('change', refreshPlacement);
     } else if (typeof mobileQuery.addListener === 'function') {
       mobileQuery.addListener(refreshPlacement);
     }
+  }
 
-    if (typeof window.MutationObserver === 'function') {
+  if (typeof window.MutationObserver === 'function') {
+    var observeTarget = root || document.body;
+    if (observeTarget) {
       var observer = new MutationObserver(debounce(function () {
-        applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+        if (root) {
+          applyDefaultsWithRetry(null, { variant: getCurrentVariant() }, 0);
+        }
+        if (wsI18nEnabled) {
+          applyI18nWithRetry(null, { overwrite: false }, 0);
+        }
       }, 80));
 
-      observer.observe(root, {
+      observer.observe(observeTarget, {
         childList: true,
         subtree: true
       });

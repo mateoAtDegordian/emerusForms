@@ -18,6 +18,10 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
   - Define rules in plugin settings
   - Auto-fill hidden/empty fields in WS Form
   - Optional custom JS hook template (run only when enabled)
+- WS #text translation injection (HR / EN):
+  - Define rules in plugin settings: `field_name|hr_value|en_value`
+  - Plugin fills hidden/source fields by current language
+  - Use official WS syntax in labels/placeholders/help text: `#text(#field(123))`
 - Zoho helper for WS forms already on page:
   - `window.EmerusZoho.sendWsForm(form, options)`
   - Does not require plugin-injected overlay form
@@ -50,8 +54,9 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 6. Optional: fill per-page title/subtitle override tables.
 7. Optional: add `WS default field rules by page`.
 8. Optional: enable `Load JS integration helpers on all frontend pages`.
-9. Optional: configure `Global Metadata Injection` field names and UTM keys.
-10. Optional: configure `GTM / Data Layer` event settings.
+9. Optional: enable `WS #text translation rules` for dynamic EN/HR labels.
+10. Optional: configure `Global Metadata Injection` field names and UTM keys.
+11. Optional: configure `GTM / Data Layer` event settings.
 
 ## WS Field Defaults (Hidden Field Support)
 
@@ -77,6 +82,34 @@ Custom JS hook:
 - Event name: `emerus-ws-defaults-applied`
 - Detail includes: `defaults`, `variant`, `pageId`, `pageSlug`, `appliedCount`
 - You can edit the `Custom JS hook` textarea in plugin settings as needed.
+
+## WS Dynamic Translation With #text
+
+Enable `WS #text translation rules` and define lines:
+
+- `match_key_or_text|hr_value|en_value`
+
+Examples:
+
+- `i18n_full_name_label|Puno ime|Full name`
+- `i18n_submit_label|Pošalji upit|Request a demo`
+- `Full name|Puno ime|Full name`
+
+In WS Form:
+
+1. Add a hidden (or text) source field with **Name** = `field_name` (e.g. `i18n_full_name_label`).
+2. Use source field ID in target Label / Placeholder / Help Text:
+   - `#text(#field(123))`
+3. Plugin auto-fills source field by current site language (`hr` / `en`).
+
+Simple mode (no hidden source fields):
+
+- Put token directly into WS text value and plugin replaces it automatically:
+  - `i18n_full_name_label`
+  - `[[i18n_full_name_label]]`
+  - `{{i18n_full_name_label}}`
+- Works for labels, placeholders, help text and submit button text.
+- ENG-as-key mode: put exact English UI text as first column and plugin replaces it with HR only on Croatian pages.
 
 ## WS Submit Integration (Existing WS Forms)
 
@@ -142,6 +175,7 @@ Main options for `sendWsForm(form, options)`:
 - `mapFields`: object for field name mapping
 - `staticLead`: object merged into `lead`
 - `extraPayload`: object merged at payload root
+- `applyI18n`: auto-apply plugin i18n field rules before collecting values (default `true`)
 
 ## Zoho Backend API
 
