@@ -191,12 +191,23 @@
 
     var pageId = asString(config.pageId || '');
     var pageSlug = asString(config.pageSlug || '').toLowerCase();
+    var parentPageId = asString(config.parentPageId || '');
+    var parentPageSlug = asString(config.parentPageSlug || '').toLowerCase();
 
     for (var i = 0; i < rule.refs.length; i += 1) {
       var ref = asString(rule.refs[i] || '').toLowerCase();
       if (ref === '*') {
         return true;
       }
+
+      if (ref.indexOf('parent:') === 0) {
+        var parentRef = ref.slice(7);
+        if (parentRef && ((parentPageId && parentRef === parentPageId) || (parentPageSlug && parentRef === parentPageSlug))) {
+          return true;
+        }
+        continue;
+      }
+
       if (pageId && ref === pageId) {
         return true;
       }
@@ -448,6 +459,28 @@
     return merged;
   }
 
+  function inferFormKey(form, options) {
+    var opts = options || {};
+    if (opts.formKey) {
+      return asString(opts.formKey);
+    }
+
+    if (!form) {
+      return '';
+    }
+
+    var explicit = asString(form.getAttribute('data-form-key') || '');
+    if (explicit) {
+      return explicit;
+    }
+
+    if (form.id) {
+      return asString(form.id);
+    }
+
+    return '';
+  }
+
   function getSessionStore() {
     try {
       return window.sessionStorage;
@@ -680,6 +713,7 @@
       event: eventName,
       emerus_status: type,
       emerus_form_variant: asString(payloadObj.form_variant || ''),
+      emerus_form_key: asString(payloadObj.form_key || ''),
       emerus_page_url: asString(payloadObj.page_url || window.location.href),
       emerus_page_title: asString(payloadObj.page_title || document.title),
       emerus_rows_count: Array.isArray(payloadObj.rows) ? payloadObj.rows.length : 0,
@@ -786,6 +820,7 @@
 
     var payload = {
       form_variant: variant,
+      form_key: inferFormKey(form, opts),
       page_url: window.location.href,
       page_title: document.title
     };

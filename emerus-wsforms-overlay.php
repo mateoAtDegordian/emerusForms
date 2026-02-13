@@ -83,6 +83,8 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     return;
   }
 
+  var formKey = 'PLACEHOLDER_FORM_KEY'; // npr. "services_products_en"
+
   // Replace placeholders with your actual field IDs.
   // Remove keys you do not need.
   var selectors = {
@@ -90,7 +92,6 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
     First_Name: '#PLACEHOLDER_FIRST_NAME_ID',
     Email: '#PLACEHOLDER_EMAIL_ID',
     Phone: '#PLACEHOLDER_PHONE_ID',
-    Lead_Source: '#PLACEHOLDER_LEAD_SOURCE_ID',
     Description: '#PLACEHOLDER_DESCRIPTION_ID',
     Interes: '#PLACEHOLDER_INTEREST_ID',
     'Landing Page': '#PLACEHOLDER_LANDING_PAGE_ID',
@@ -130,7 +131,6 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
       First_Name: getValueBySelector(selectors.First_Name),
       Email: getValueBySelector(selectors.Email),
       Phone: getValueBySelector(selectors.Phone),
-      Lead_Source: getValueBySelector(selectors.Lead_Source) || 'Website',
       Description: getValueBySelector(selectors.Description),
       Interes: getValueBySelector(selectors.Interes),
       'Landing Page': getValueBySelector(selectors['Landing Page']) || window.location.href,
@@ -153,6 +153,7 @@ WS Form custom JS example (for forms already placed on page, not injected by plu
 
     await window.EmerusZoho.sendLead({
       form_variant: 'product', // hero or product
+      form_key: formKey,
       page_url: window.location.href,
       page_title: document.title,
       rows: rows,
@@ -168,6 +169,7 @@ JS;
     private function ws_payload_json_template() {
         $template = [
             'form_variant' => 'product',
+            'form_key'     => 'services_products_en',
             'page_url'     => 'https://example.com/industrijski-profili',
             'page_title'   => 'Industrijski profili - Emerus',
             'rows'         => [
@@ -175,7 +177,6 @@ JS;
                 ['k' => 'First_Name', 'v' => 'Test'],
                 ['k' => 'Email', 'v' => 'test@example.com'],
                 ['k' => 'Phone', 'v' => '+38599111222'],
-                ['k' => 'Lead_Source', 'v' => 'Website'],
                 ['k' => 'Description', 'v' => 'Opis upita.'],
                 ['k' => 'Interes', 'v' => 'Industrijski profili'],
                 ['k' => 'Landing Page', 'v' => 'https://example.com/industrijski-profili'],
@@ -188,7 +189,6 @@ JS;
                 'First_Name'       => 'Test',
                 'Email'            => 'test@example.com',
                 'Phone'            => '+38599111222',
-                'Lead_Source'      => 'Website',
                 'Description'      => 'Opis upita.',
                 'Interes'          => 'Industrijski profili',
                 'Landing Page'     => 'https://example.com/industrijski-profili',
@@ -248,6 +248,7 @@ JS;
             'zoho_lead_source'           => 'Website',
             'zoho_sub_source_hero'       => 'Hero forma',
             'zoho_sub_source_product'    => 'Ponuda - proizvod',
+            'zoho_sub_source_map'        => [],
             'zoho_source_field_api'      => 'Lead_Source',
             'zoho_sub_source_field_api'  => '',
             'zoho_page_url_field_api'    => '',
@@ -308,6 +309,7 @@ JS;
             'zoho_lead_source'           => isset($raw['zoho_lead_source']) ? sanitize_text_field($raw['zoho_lead_source']) : $defaults['zoho_lead_source'],
             'zoho_sub_source_hero'       => isset($raw['zoho_sub_source_hero']) ? sanitize_text_field($raw['zoho_sub_source_hero']) : $defaults['zoho_sub_source_hero'],
             'zoho_sub_source_product'    => isset($raw['zoho_sub_source_product']) ? sanitize_text_field($raw['zoho_sub_source_product']) : $defaults['zoho_sub_source_product'],
+            'zoho_sub_source_map'        => $this->sanitize_key_value_rows(isset($raw['zoho_sub_source_map']) ? (array) $raw['zoho_sub_source_map'] : []),
             'zoho_source_field_api'      => isset($raw['zoho_source_field_api']) ? sanitize_text_field($raw['zoho_source_field_api']) : $defaults['zoho_source_field_api'],
             'zoho_sub_source_field_api'  => isset($raw['zoho_sub_source_field_api']) ? sanitize_text_field($raw['zoho_sub_source_field_api']) : $defaults['zoho_sub_source_field_api'],
             'zoho_page_url_field_api'    => isset($raw['zoho_page_url_field_api']) ? sanitize_text_field($raw['zoho_page_url_field_api']) : $defaults['zoho_page_url_field_api'],
@@ -411,6 +413,59 @@ JS;
                             </td>
                         </tr>
                     <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    private function sanitize_key_value_rows(array $rows) {
+        $clean = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $match = isset($row['match']) ? sanitize_text_field((string) $row['match']) : '';
+            $value = isset($row['value']) ? sanitize_text_field((string) $row['value']) : '';
+            if ($match === '' || $value === '') {
+                continue;
+            }
+
+            $clean[] = [
+                'match' => $match,
+                'value' => $value,
+            ];
+        }
+
+        return $clean;
+    }
+
+    private function render_key_value_rows_table($option_field, array $rows, $columns = ['Match', 'Value']) {
+        $rows_count = max(8, count($rows) + 2);
+        ?>
+        <div style="max-width: 980px;">
+            <table class="widefat striped">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;"><?php echo esc_html($columns[0]); ?></th>
+                        <th><?php echo esc_html($columns[1]); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php for ($i = 0; $i < $rows_count; $i++) : ?>
+                        <?php
+                        $row = isset($rows[$i]) && is_array($rows[$i]) ? $rows[$i] : ['match' => '', 'value' => ''];
+                        ?>
+                        <tr>
+                            <td>
+                                <input type="text" class="regular-text code" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo (int) $i; ?>][match]" value="<?php echo esc_attr((string) $row['match']); ?>" />
+                            </td>
+                            <td>
+                                <input type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_field); ?>][<?php echo (int) $i; ?>][value]" value="<?php echo esc_attr((string) $row['value']); ?>" />
+                            </td>
+                        </tr>
+                    <?php endfor; ?>
                 </tbody>
             </table>
         </div>
@@ -601,7 +656,7 @@ JS;
                             <textarea id="ws_default_rules" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_default_rules]" rows="7" class="large-text code"><?php echo esc_textarea($options['ws_default_rules']); ?></textarea>
                             <p class="description">One rule per line: <code>page_refs|field_name|value|variant</code></p>
                             <p class="description">Examples: <code>industrijski-profili,solar|Interes|Industrijski profili|product</code> or <code>*|Lead_Type|Website|both</code></p>
-                            <p class="description"><code>page_refs</code> accepts page IDs and/or slugs separated by comma. <code>variant</code> is <code>hero</code>, <code>product</code>, or <code>both</code>.</p>
+                            <p class="description"><code>page_refs</code> accepts page IDs and/or slugs separated by comma. Supports parent match with prefix <code>parent:</code> (example: <code>parent:standardni-alu-profili|Interes|Industrijski profili|product</code>). <code>variant</code> is <code>hero</code>, <code>product</code>, or <code>both</code>.</p>
                         </td>
                     </tr>
                     <tr>
@@ -743,6 +798,13 @@ JS;
                         <td><input type="text" id="zoho_sub_source_product" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_sub_source_product]" value="<?php echo esc_attr($options['zoho_sub_source_product']); ?>" class="regular-text" /></td>
                     </tr>
                     <tr>
+                        <th scope="row">Sub-source mapping table</th>
+                        <td>
+                            <p class="description">Map form groups to a common sub-source value. Match supports: <code>form_key:services_en</code>, <code>variant:product</code>, or <code>*</code>.</p>
+                            <?php $this->render_key_value_rows_table('zoho_sub_source_map', isset($options['zoho_sub_source_map']) ? (array) $options['zoho_sub_source_map'] : [], ['Match', 'Sub-source value']); ?>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="zoho_source_field_api">Lead Source API field</label></th>
                         <td>
                             <input type="text" id="zoho_source_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_source_field_api]" value="<?php echo esc_attr($options['zoho_source_field_api']); ?>" class="regular-text code" />
@@ -773,12 +835,14 @@ JS;
                         <td>
                             <ul style="margin-top:0;">
                                 <li><code>formVariant</code>: <code>hero</code> or <code>product</code></li>
+                                <li><code>formKey</code>: key used for Sub-Source mapping table (recommended)</li>
                                 <li><code>mode</code>: <code>rows</code>, <code>lead</code>, or <code>both</code></li>
                                 <li><code>includeEmpty</code>: include empty values (<code>true</code>/<code>false</code>)</li>
                                 <li><code>mapFields</code>: map form field names to Zoho API names</li>
                                 <li><code>staticLead</code>: extra fixed lead data always appended</li>
                                 <li><code>extraPayload</code>: extra top-level payload values</li>
                             </ul>
+                            <p class="description"><code>Lead_Source</code> is filled automatically from plugin settings (typically <code>Website</code>).</p>
                             <p class="description">Global injection (from plugin options) can auto-add <code>Landing Page</code>, <code>Page Title</code>, and <code>UTM polja</code> without WS form fields.</p>
                             <p class="description">JSON sent to backend stays aligned with your tested format (rows and/or lead object).</p>
                         </td>
@@ -835,6 +899,15 @@ JS;
         );
 
         $page = get_post(get_queried_object_id());
+        $parent_id = 0;
+        $parent_slug = '';
+        if ($page && !empty($page->post_parent)) {
+            $parent_id = (int) $page->post_parent;
+            $parent = get_post($parent_id);
+            if ($parent) {
+                $parent_slug = (string) $parent->post_name;
+            }
+        }
 
         wp_localize_script('emerus-wsforms-overlay', 'EmerusWsFormsOverlay', [
             'restUrl'        => esc_url_raw(rest_url('emerus-wsforms/v1/zoho-lead')),
@@ -844,6 +917,8 @@ JS;
             'lang'           => $this->current_lang_code(),
             'pageId'         => (int) get_queried_object_id(),
             'pageSlug'       => $page ? (string) $page->post_name : '',
+            'parentPageId'   => $parent_id,
+            'parentPageSlug' => $parent_slug,
             'wsDefaultRules' => $this->parse_ws_default_rules((string) $options['ws_default_rules']),
             'globalContext'  => [
                 'enabled'         => (int) $options['global_context_enabled'] === 1,
@@ -1099,6 +1174,22 @@ JS;
                     continue;
                 }
 
+                if (stripos($ref, 'parent:') === 0) {
+                    $parent_ref = trim(substr($ref, 7));
+                    if ($parent_ref === '') {
+                        continue;
+                    }
+                    if (ctype_digit($parent_ref)) {
+                        $refs[] = 'parent:' . (string) absint($parent_ref);
+                        continue;
+                    }
+                    $parent_slug = sanitize_title($parent_ref);
+                    if ($parent_slug !== '') {
+                        $refs[] = 'parent:' . $parent_slug;
+                    }
+                    continue;
+                }
+
                 if (ctype_digit($ref)) {
                     $refs[] = (string) absint($ref);
                     continue;
@@ -1152,6 +1243,65 @@ JS;
         }
 
         return array_values(array_unique($keys));
+    }
+
+    private function resolve_sub_source_value(array $payload, $variant, array $options) {
+        $form_key = isset($payload['form_key']) ? strtolower(trim(sanitize_text_field((string) $payload['form_key']))) : '';
+        $variant = strtolower(trim((string) $variant));
+        $rules = isset($options['zoho_sub_source_map']) && is_array($options['zoho_sub_source_map']) ? $options['zoho_sub_source_map'] : [];
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $match = isset($rule['match']) ? strtolower(trim((string) $rule['match'])) : '';
+            $value = isset($rule['value']) ? trim((string) $rule['value']) : '';
+            if ($match === '' || $value === '') {
+                continue;
+            }
+
+            if ($this->sub_source_rule_matches($match, $form_key, $variant)) {
+                return $value;
+            }
+        }
+
+        return $variant === 'product' ? (string) $options['zoho_sub_source_product'] : (string) $options['zoho_sub_source_hero'];
+    }
+
+    private function sub_source_rule_matches($match, $form_key, $variant) {
+        $tokens = array_filter(array_map('trim', explode(',', (string) $match)));
+        if (empty($tokens)) {
+            return false;
+        }
+
+        foreach ($tokens as $token) {
+            if ($token === '*') {
+                return true;
+            }
+
+            if (strpos($token, 'variant:') === 0) {
+                $v = trim(substr($token, 8));
+                if ($v !== '' && $v === $variant) {
+                    return true;
+                }
+                continue;
+            }
+
+            if (strpos($token, 'form_key:') === 0) {
+                $key = trim(substr($token, 9));
+                if ($key !== '' && $form_key !== '' && $key === $form_key) {
+                    return true;
+                }
+                continue;
+            }
+
+            if ($form_key !== '' && $token === $form_key) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function current_lang_code() {
@@ -1217,7 +1367,7 @@ JS;
 
         $sub_source_field = trim((string) $options['zoho_sub_source_field_api']);
         if ($sub_source_field !== '' && empty($lead[$sub_source_field])) {
-            $lead[$sub_source_field] = $variant === 'product' ? (string) $options['zoho_sub_source_product'] : (string) $options['zoho_sub_source_hero'];
+            $lead[$sub_source_field] = $this->resolve_sub_source_value($payload, $variant, $options);
         }
 
         $page_url = isset($payload['page_url']) ? esc_url_raw($payload['page_url']) : '';

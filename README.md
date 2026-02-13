@@ -62,6 +62,7 @@ Rule format in plugin settings:
 Examples:
 
 - `industrijski-profili,solarni-sustavi|Interes|Industrijski profili|product`
+- `parent:standardni-alu-profili|Interes|Industrijski profili|product`
 - `42|Lead_Type|Hero Inquiry|hero`
 - `*|Lead_Source|Website|both`
 
@@ -86,9 +87,7 @@ var lead = {
   Last_Name: document.querySelector('#PLACEHOLDER_FULL_NAME_ID')?.value || '',
   Email: document.querySelector('#PLACEHOLDER_EMAIL_ID')?.value || '',
   Phone: document.querySelector('#PLACEHOLDER_PHONE_ID')?.value || '',
-  Interes: document.querySelector('#PLACEHOLDER_INTEREST_ID')?.value || '',
-  GDPR_Consent: document.querySelector('#PLACEHOLDER_GDPR_ID')?.checked ? '1' : '0',
-  Lead_Source: 'Website'
+  Interes: document.querySelector('#PLACEHOLDER_INTEREST_ID')?.value || ''
 };
 
 var rows = Object.keys(lead)
@@ -97,6 +96,7 @@ var rows = Object.keys(lead)
 
 await window.EmerusZoho.sendLead({
   form_variant: 'product',
+  form_key: 'services_products_en',
   page_url: window.location.href,
   page_title: document.title,
   rows,
@@ -105,6 +105,8 @@ await window.EmerusZoho.sendLead({
 ```
 
 If `Global Metadata Injection` is enabled, `Landing Page`, `Page Title`, and `UTM polja` are appended automatically even when not present in the form.
+`Lead_Source` is injected from plugin settings (usually `Website`), so you do not need it in JS template.
+Zoho sub-source can be grouped with `Sub-source mapping table` using matches like `form_key:services_products_en` or `variant:product`.
 
 If `GTM / Data Layer` is enabled, each helper send pushes a Data Layer event with form variant and status.
 
@@ -112,6 +114,7 @@ Alternative helper still available: `window.EmerusZoho.sendWsForm(form, options)
 
 Main options for `sendWsForm(form, options)`:
 
+- `formKey`: key used for sub-source mapping (recommended)
 - `formVariant`: `hero` or `product`
 - `mode`: `rows`, `lead`, `both`
 - `includeEmpty`: `true` / `false`
