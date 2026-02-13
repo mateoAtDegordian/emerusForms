@@ -19,9 +19,12 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
   - Auto-fill hidden/empty fields in WS Form
   - Optional custom JS hook template (run only when enabled)
 - WS #text translation injection (HR / EN):
-  - Define rules in plugin settings: `field_name|hr_value|en_value`
+  - Define rules in plugin settings: `match_key_or_text|hr_value` or `match_key_or_text|hr_value|en_value`
   - Plugin fills hidden/source fields by current language
   - Use official WS syntax in labels/placeholders/help text: `#text(#field(123))`
+- Privacy compliance copy helper:
+  - Auto-adjust GDPR checkbox text and Privacy Policy link by language
+  - Configurable HR/EN prefix, link text and URL
 - Zoho helper for WS forms already on page:
   - `window.EmerusZoho.sendWsForm(form, options)`
   - Does not require plugin-injected overlay form
@@ -55,8 +58,9 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 7. Optional: add `WS default field rules by page`.
 8. Optional: enable `Load JS integration helpers on all frontend pages`.
 9. Optional: enable `WS #text translation rules` for dynamic EN/HR labels.
-10. Optional: configure `Global Metadata Injection` field names and UTM keys.
-11. Optional: configure `GTM / Data Layer` event settings.
+10. Optional: configure `Privacy compliance text` (GDPR checkbox copy + link).
+11. Optional: configure `Global Metadata Injection` field names and UTM keys.
+12. Optional: configure `GTM / Data Layer` event settings.
 
 ## WS Field Defaults (Hidden Field Support)
 

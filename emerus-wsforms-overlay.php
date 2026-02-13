@@ -345,6 +345,13 @@ JS;
             'ws_default_rules'           => '',
             'ws_i18n_enabled'            => 0,
             'ws_i18n_rules'              => '',
+            'privacy_compliance_enabled' => 1,
+            'privacy_prefix_hr'          => 'Slažem se s ',
+            'privacy_prefix_en'          => 'I agree to the ',
+            'privacy_link_text_hr'       => 'Politikom privatnosti',
+            'privacy_link_text_en'       => 'Privacy Policy',
+            'privacy_url_hr'             => '',
+            'privacy_url_en'             => '',
             'ws_custom_js_enabled'       => 0,
             'ws_custom_js'               => $this->default_custom_js_template(),
             'overlay_max_width'          => 420,
@@ -409,6 +416,13 @@ JS;
             'ws_default_rules'           => isset($raw['ws_default_rules']) ? sanitize_textarea_field($raw['ws_default_rules']) : $defaults['ws_default_rules'],
             'ws_i18n_enabled'            => !empty($raw['ws_i18n_enabled']) ? 1 : 0,
             'ws_i18n_rules'              => isset($raw['ws_i18n_rules']) ? sanitize_textarea_field($raw['ws_i18n_rules']) : $defaults['ws_i18n_rules'],
+            'privacy_compliance_enabled' => !empty($raw['privacy_compliance_enabled']) ? 1 : 0,
+            'privacy_prefix_hr'          => isset($raw['privacy_prefix_hr']) ? sanitize_text_field($raw['privacy_prefix_hr']) : $defaults['privacy_prefix_hr'],
+            'privacy_prefix_en'          => isset($raw['privacy_prefix_en']) ? sanitize_text_field($raw['privacy_prefix_en']) : $defaults['privacy_prefix_en'],
+            'privacy_link_text_hr'       => isset($raw['privacy_link_text_hr']) ? sanitize_text_field($raw['privacy_link_text_hr']) : $defaults['privacy_link_text_hr'],
+            'privacy_link_text_en'       => isset($raw['privacy_link_text_en']) ? sanitize_text_field($raw['privacy_link_text_en']) : $defaults['privacy_link_text_en'],
+            'privacy_url_hr'             => isset($raw['privacy_url_hr']) ? esc_url_raw(trim((string) $raw['privacy_url_hr'])) : $defaults['privacy_url_hr'],
+            'privacy_url_en'             => isset($raw['privacy_url_en']) ? esc_url_raw(trim((string) $raw['privacy_url_en'])) : $defaults['privacy_url_en'],
             'ws_custom_js_enabled'       => !empty($raw['ws_custom_js_enabled']) ? 1 : 0,
             'ws_custom_js'               => isset($raw['ws_custom_js']) ? $this->sanitize_custom_js($raw['ws_custom_js']) : $defaults['ws_custom_js'],
             'overlay_max_width'          => isset($raw['overlay_max_width']) ? max(280, min(640, absint($raw['overlay_max_width']))) : $defaults['overlay_max_width'],
@@ -802,6 +816,43 @@ JS;
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">Privacy compliance text</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_compliance_enabled]" value="1" <?php checked((int) $options['privacy_compliance_enabled'], 1); ?> />
+                                Auto-adjust WS GDPR checkbox text and privacy link by language.
+                            </label>
+                            <p class="description">Targets labels containing privacy-policy links (checkbox consent text).</p>
+                            <table style="margin-top: 8px;">
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_prefix_hr">Prefix HR</label></td>
+                                    <td><input type="text" id="privacy_prefix_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_prefix_hr]" value="<?php echo esc_attr($options['privacy_prefix_hr']); ?>" class="regular-text" /></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_prefix_en">Prefix EN</label></td>
+                                    <td><input type="text" id="privacy_prefix_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_prefix_en]" value="<?php echo esc_attr($options['privacy_prefix_en']); ?>" class="regular-text" /></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_link_text_hr">Link text HR</label></td>
+                                    <td><input type="text" id="privacy_link_text_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_link_text_hr]" value="<?php echo esc_attr($options['privacy_link_text_hr']); ?>" class="regular-text" /></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_link_text_en">Link text EN</label></td>
+                                    <td><input type="text" id="privacy_link_text_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_link_text_en]" value="<?php echo esc_attr($options['privacy_link_text_en']); ?>" class="regular-text" /></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_url_hr">Privacy URL HR</label></td>
+                                    <td><input type="url" id="privacy_url_hr" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_url_hr]" value="<?php echo esc_attr($options['privacy_url_hr']); ?>" class="regular-text code" /></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-right:10px;"><label for="privacy_url_en">Privacy URL EN</label></td>
+                                    <td><input type="url" id="privacy_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[privacy_url_en]" value="<?php echo esc_attr($options['privacy_url_en']); ?>" class="regular-text code" /></td>
+                                </tr>
+                            </table>
+                            <p class="description">If URL is empty, plugin uses WordPress Privacy Policy URL fallback.</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="ws_custom_js">Custom JS hook (optional)</label></th>
                         <td>
                             <label>
@@ -1034,7 +1085,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.3'
+                '0.3.4'
             );
         }
 
@@ -1042,7 +1093,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.3',
+            '0.3.4',
             true
         );
 
@@ -1071,6 +1122,16 @@ JS;
             'wsI18n'         => [
                 'enabled' => (int) $options['ws_i18n_enabled'] === 1,
                 'rules'   => $this->parse_ws_i18n_rules((string) $options['ws_i18n_rules']),
+            ],
+            'privacyCompliance' => [
+                'enabled'      => (int) $options['privacy_compliance_enabled'] === 1,
+                'prefixHr'     => (string) $options['privacy_prefix_hr'],
+                'prefixEn'     => (string) $options['privacy_prefix_en'],
+                'linkTextHr'   => (string) $options['privacy_link_text_hr'],
+                'linkTextEn'   => (string) $options['privacy_link_text_en'],
+                'urlHr'        => (string) $options['privacy_url_hr'],
+                'urlEn'        => (string) $options['privacy_url_en'],
+                'fallbackUrl'  => esc_url_raw(get_privacy_policy_url()),
             ],
             'globalContext'  => [
                 'enabled'         => (int) $options['global_context_enabled'] === 1,

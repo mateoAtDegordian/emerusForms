@@ -580,6 +580,99 @@
     return i18nConfig.rules;
   }
 
+  function getPrivacyComplianceConfig() {
+    var privacy = config.privacyCompliance && typeof config.privacyCompliance === 'object' ? config.privacyCompliance : {};
+    if (!privacy.enabled) {
+      return null;
+    }
+    return privacy;
+  }
+
+  function resolvePrivacyComplianceCopy() {
+    var privacy = getPrivacyComplianceConfig();
+    if (!privacy) {
+      return null;
+    }
+
+    var lang = getCurrentLangCode();
+    var isHr = lang === 'hr';
+    var prefix = asString(isHr ? privacy.prefixHr : privacy.prefixEn).trim();
+    var linkText = asString(isHr ? privacy.linkTextHr : privacy.linkTextEn).trim();
+    var url = asString(isHr ? privacy.urlHr : privacy.urlEn).trim();
+    if (!url) {
+      url = asString(privacy.fallbackUrl || '').trim();
+    }
+
+    return {
+      prefix: prefix,
+      linkText: linkText,
+      url: url
+    };
+  }
+
+  function applyPrivacyComplianceText(container) {
+    var copy = resolvePrivacyComplianceCopy();
+    if (!copy) {
+      return 0;
+    }
+
+    var target = container && container.querySelectorAll ? container : document;
+    var roots = getI18nRoots(target);
+    var changed = 0;
+
+    for (var i = 0; i < roots.length; i += 1) {
+      var root = roots[i];
+      if (!root || !root.querySelectorAll) {
+        continue;
+      }
+
+      var anchors = root.querySelectorAll('label.wsf-label a[href*="privacy"], label.wsf-label a[href*="privat"]');
+      for (var j = 0; j < anchors.length; j += 1) {
+        var anchor = anchors[j];
+        var label = anchor.closest ? anchor.closest('label.wsf-label') : null;
+        if (!label) {
+          continue;
+        }
+
+        if (copy.url && asString(anchor.getAttribute('href') || '') !== copy.url) {
+          anchor.setAttribute('href', copy.url);
+          changed += 1;
+        }
+
+        if (copy.linkText && asString(anchor.textContent || '').trim() !== copy.linkText) {
+          anchor.textContent = copy.linkText;
+          changed += 1;
+        }
+
+        if (copy.prefix) {
+          var prefixText = copy.prefix;
+          var textNode = null;
+          for (var c = 0; c < label.childNodes.length; c += 1) {
+            var child = label.childNodes[c];
+            if (child === anchor) {
+              break;
+            }
+            if (child && child.nodeType === 3 && asString(child.nodeValue).trim() !== '') {
+              textNode = child;
+            }
+          }
+
+          if (textNode) {
+            if (asString(textNode.nodeValue) !== prefixText) {
+              textNode.nodeValue = prefixText;
+              changed += 1;
+            }
+          } else {
+            label.insertBefore(document.createTextNode(prefixText), anchor);
+            changed += 1;
+          }
+        }
+      }
+    }
+
+    return changed;
+  }
+
   function applyI18nToContainer(container, options) {
     var target = container && container.querySelectorAll ? container : document;
     var opts = options || {};
@@ -613,6 +706,9 @@
     // i18n_key, [[i18n_key]], or {{i18n_key}}
     var tokenChanges = applyI18nTextTokens(target, resolved);
     appliedCount += tokenChanges;
+
+    // Dedicated GDPR / privacy consent label compliance copy.
+    appliedCount += applyPrivacyComplianceText(target);
 
     return {
       values: resolved,
