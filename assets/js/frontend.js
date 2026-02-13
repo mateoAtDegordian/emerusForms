@@ -257,6 +257,23 @@
     if (lang.indexOf('en') === 0) {
       return 'en';
     }
+
+    var htmlLang = asString(document.documentElement && document.documentElement.lang ? document.documentElement.lang : '').toLowerCase();
+    if (htmlLang.indexOf('hr') === 0) {
+      return 'hr';
+    }
+    if (htmlLang.indexOf('en') === 0) {
+      return 'en';
+    }
+
+    var path = asString(window.location && window.location.pathname ? window.location.pathname : '').toLowerCase();
+    if (/^\/hr(\/|$)/.test(path)) {
+      return 'hr';
+    }
+    if (/^\/en(\/|$)/.test(path)) {
+      return 'en';
+    }
+
     return 'en';
   }
 

@@ -793,8 +793,8 @@ JS;
                             </label>
                             <br /><br />
                             <textarea id="ws_i18n_rules" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_i18n_rules]" rows="7" class="large-text code"><?php echo esc_textarea($options['ws_i18n_rules']); ?></textarea>
-                            <p class="description">One rule per line: <code>match_key_or_text|hr_value|en_value</code></p>
-                            <p class="description">Examples: <code>i18n_full_name_label|Puno ime|Full name</code> or <code>Full name|Puno ime|Full name</code></p>
+                            <p class="description">One rule per line: <code>match_key_or_text|hr_value</code> or <code>match_key_or_text|hr_value|en_value</code></p>
+                            <p class="description">Examples: <code>Full name|Puno ime</code>, <code>Phone number|Telefon</code>, or <code>i18n_full_name_label|Puno ime|Full name</code></p>
                             <p class="description">Simple mode (no hidden source fields): write token directly in WS text (Label/Placeholder/Help/Button), e.g. <code>i18n_full_name_label</code>, <code>[[i18n_full_name_label]]</code>, or <code>{{i18n_full_name_label}}</code>. Plugin auto-replaces by current language.</p>
                             <p class="description">ENG-as-key mode: put exact English text as first column (e.g. <code>Full name</code>) and plugin will auto-replace to HR only when needed.</p>
                             <p class="description">In WS Form you can also use official variable in Label/Placeholder/Help Text: <code>#text(#field(123))</code>, where 123 is hidden source field ID and that hidden field Name matches first column key.</p>
@@ -1385,8 +1385,8 @@ JS;
         $rules = [];
 
         foreach ($lines as $line) {
-            $parts = array_map('trim', explode('|', $line, 3));
-            if (count($parts) < 3) {
+            $parts = array_map('trim', explode('|', $line));
+            if (count($parts) < 2) {
                 continue;
             }
 
@@ -1396,7 +1396,7 @@ JS;
             }
 
             $hr = sanitize_text_field((string) $parts[1]);
-            $en = sanitize_text_field((string) $parts[2]);
+            $en = isset($parts[2]) ? sanitize_text_field((string) $parts[2]) : $field;
             if ($hr === '' && $en === '') {
                 continue;
             }

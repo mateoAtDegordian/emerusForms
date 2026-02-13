@@ -87,13 +87,15 @@ Custom JS hook:
 
 Enable `WS #text translation rules` and define lines:
 
-- `match_key_or_text|hr_value|en_value`
+- `match_key_or_text|hr_value`
+- or `match_key_or_text|hr_value|en_value`
 
 Examples:
 
 - `i18n_full_name_label|Puno ime|Full name`
 - `i18n_submit_label|Pošalji upit|Request a demo`
-- `Full name|Puno ime|Full name`
+- `Full name|Puno ime`
+- `Phone number|Telefon`
 
 In WS Form:
 
