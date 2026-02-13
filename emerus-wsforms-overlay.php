@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.1
+ * Version: 0.3.2
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -232,6 +232,11 @@ JS;
             'context_utm_field_api'      => 'UTM polja',
             'context_utm_keys'           => 'utm_source,utm_medium,utm_campaign,utm_content,utm_term,utm_id,gclid,fbclid,msclkid',
             'context_use_first_session'  => 1,
+            'datalayer_enabled'          => 1,
+            'datalayer_object_name'      => 'dataLayer',
+            'datalayer_event_success'    => 'emerus_zoho_submit_success',
+            'datalayer_event_error'      => 'emerus_zoho_submit_error',
+            'datalayer_include_payload'  => 1,
             'zoho_enabled'               => 0,
             'zoho_client_id'             => '',
             'zoho_client_secret'         => '',
@@ -287,6 +292,11 @@ JS;
             'context_utm_field_api'      => isset($raw['context_utm_field_api']) ? sanitize_text_field($raw['context_utm_field_api']) : $defaults['context_utm_field_api'],
             'context_utm_keys'           => isset($raw['context_utm_keys']) ? sanitize_text_field($raw['context_utm_keys']) : $defaults['context_utm_keys'],
             'context_use_first_session'  => !empty($raw['context_use_first_session']) ? 1 : 0,
+            'datalayer_enabled'          => !empty($raw['datalayer_enabled']) ? 1 : 0,
+            'datalayer_object_name'      => isset($raw['datalayer_object_name']) ? $this->sanitize_datalayer_name($raw['datalayer_object_name']) : $defaults['datalayer_object_name'],
+            'datalayer_event_success'    => isset($raw['datalayer_event_success']) ? sanitize_key($raw['datalayer_event_success']) : $defaults['datalayer_event_success'],
+            'datalayer_event_error'      => isset($raw['datalayer_event_error']) ? sanitize_key($raw['datalayer_event_error']) : $defaults['datalayer_event_error'],
+            'datalayer_include_payload'  => !empty($raw['datalayer_include_payload']) ? 1 : 0,
             'zoho_enabled'               => !empty($raw['zoho_enabled']) ? 1 : 0,
             'zoho_client_id'             => isset($raw['zoho_client_id']) ? sanitize_text_field($raw['zoho_client_id']) : $defaults['zoho_client_id'],
             'zoho_client_secret'         => isset($raw['zoho_client_secret']) ? sanitize_text_field($raw['zoho_client_secret']) : $defaults['zoho_client_secret'],
@@ -314,6 +324,14 @@ JS;
 
         $value = str_replace(["\r\n", "\r"], "\n", (string) $value);
         return trim($value);
+    }
+
+    private function sanitize_datalayer_name($value) {
+        $value = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $value);
+        if ($value === null || $value === '') {
+            return 'dataLayer';
+        }
+        return $value;
     }
 
     private function sanitize_int_array(array $values) {
@@ -636,6 +654,43 @@ JS;
                     </tr>
                 </table>
 
+                <h2>GTM / Data Layer</h2>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row">Enable Data Layer push</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[datalayer_enabled]" value="1" <?php checked((int) $options['datalayer_enabled'], 1); ?> />
+                                Push submission events to Data Layer for GTM.
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="datalayer_object_name">Data Layer object name</label></th>
+                        <td>
+                            <input type="text" id="datalayer_object_name" name="<?php echo esc_attr(self::OPTION_KEY); ?>[datalayer_object_name]" value="<?php echo esc_attr($options['datalayer_object_name']); ?>" class="regular-text code" />
+                            <p class="description">Usually <code>dataLayer</code>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="datalayer_event_success">Success event name</label></th>
+                        <td><input type="text" id="datalayer_event_success" name="<?php echo esc_attr(self::OPTION_KEY); ?>[datalayer_event_success]" value="<?php echo esc_attr($options['datalayer_event_success']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="datalayer_event_error">Error event name</label></th>
+                        <td><input type="text" id="datalayer_event_error" name="<?php echo esc_attr(self::OPTION_KEY); ?>[datalayer_event_error]" value="<?php echo esc_attr($options['datalayer_event_error']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Include payload in Data Layer</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[datalayer_include_payload]" value="1" <?php checked((int) $options['datalayer_include_payload'], 1); ?> />
+                                Include lead / rows payload in event object.
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+
                 <h2>Zoho CRM (optional, disabled by default)</h2>
                 <table class="form-table" role="presentation">
                     <tr>
@@ -767,7 +822,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.0'
+                '0.3.2'
             );
         }
 
@@ -775,7 +830,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.1',
+            '0.3.2',
             true
         );
 
@@ -797,6 +852,13 @@ JS;
                 'utmField'        => (string) $options['context_utm_field_api'],
                 'utmKeys'         => $this->parse_csv_keys((string) $options['context_utm_keys']),
                 'useFirstSession' => (int) $options['context_use_first_session'] === 1,
+            ],
+            'dataLayer'      => [
+                'enabled'       => (int) $options['datalayer_enabled'] === 1,
+                'objectName'    => (string) $options['datalayer_object_name'],
+                'successEvent'  => (string) $options['datalayer_event_success'],
+                'errorEvent'    => (string) $options['datalayer_event_error'],
+                'includePayload'=> (int) $options['datalayer_include_payload'] === 1,
             ],
         ]);
 

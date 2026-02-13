@@ -26,6 +26,10 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
   - `Page Title`
   - `UTM polja`
   - Editable field API names in plugin options
+- GTM / Data Layer events for helper submissions:
+  - Success + error event push
+  - Editable Data Layer object and event names
+  - Optional payload inclusion
 - Auto-injection in first hero-like Bricks section, fallback to fixed right panel
 - Optional Zoho CRM backend sending endpoint (disabled by default)
 
@@ -47,6 +51,7 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 7. Optional: add `WS default field rules by page`.
 8. Optional: enable `Load JS integration helpers on all frontend pages`.
 9. Optional: configure `Global Metadata Injection` field names and UTM keys.
+10. Optional: configure `GTM / Data Layer` event settings.
 
 ## WS Field Defaults (Hidden Field Support)
 
@@ -100,6 +105,8 @@ await window.EmerusZoho.sendLead({
 ```
 
 If `Global Metadata Injection` is enabled, `Landing Page`, `Page Title`, and `UTM polja` are appended automatically even when not present in the form.
+
+If `GTM / Data Layer` is enabled, each helper send pushes a Data Layer event with form variant and status.
 
 Alternative helper still available: `window.EmerusZoho.sendWsForm(form, options)`.
 

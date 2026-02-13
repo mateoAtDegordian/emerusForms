@@ -633,31 +633,126 @@
     return finalPayload;
   }
 
+  function rowsToObject(rows) {
+    var obj = {};
+    if (!Array.isArray(rows)) {
+      return obj;
+    }
+
+    for (var i = 0; i < rows.length; i += 1) {
+      var row = rows[i];
+      if (!row || !row.k) {
+        continue;
+      }
+      obj[asString(row.k)] = asString(row.v || '');
+    }
+
+    return obj;
+  }
+
+  function getDataLayerArray() {
+    var settings = config.dataLayer && typeof config.dataLayer === 'object' ? config.dataLayer : {};
+    var objectName = asString(settings.objectName || 'dataLayer').trim() || 'dataLayer';
+
+    if (!window[objectName] || !Array.isArray(window[objectName])) {
+      window[objectName] = [];
+    }
+
+    return window[objectName];
+  }
+
+  function pushDataLayerEvent(type, payload, meta) {
+    var settings = config.dataLayer && typeof config.dataLayer === 'object' ? config.dataLayer : {};
+    if (!settings.enabled) {
+      return;
+    }
+
+    var eventName = type === 'error'
+      ? asString(settings.errorEvent || 'emerus_zoho_submit_error')
+      : asString(settings.successEvent || 'emerus_zoho_submit_success');
+
+    var payloadObj = payload && typeof payload === 'object' ? payload : {};
+    var leadObj = payloadObj.lead && typeof payloadObj.lead === 'object'
+      ? payloadObj.lead
+      : rowsToObject(payloadObj.rows || []);
+
+    var dlEvent = {
+      event: eventName,
+      emerus_status: type,
+      emerus_form_variant: asString(payloadObj.form_variant || ''),
+      emerus_page_url: asString(payloadObj.page_url || window.location.href),
+      emerus_page_title: asString(payloadObj.page_title || document.title),
+      emerus_rows_count: Array.isArray(payloadObj.rows) ? payloadObj.rows.length : 0,
+      emerus_lead_fields: Object.keys(leadObj)
+    };
+
+    var metaObj = meta && typeof meta === 'object' ? meta : {};
+    if (typeof metaObj.httpStatus !== 'undefined') {
+      dlEvent.emerus_http_status = metaObj.httpStatus;
+    }
+    if (metaObj.errorMessage) {
+      dlEvent.emerus_error_message = asString(metaObj.errorMessage);
+    }
+    if (metaObj.zohoId) {
+      dlEvent.emerus_zoho_id = asString(metaObj.zohoId);
+    }
+
+    if (settings.includePayload) {
+      dlEvent.emerus_payload = payloadObj;
+      dlEvent.emerus_lead = leadObj;
+    }
+
+    getDataLayerArray().push(dlEvent);
+  }
+
   async function sendLead(payload) {
     if (!config.restUrl) {
       throw new Error('Zoho endpoint URL is missing.');
     }
 
     var finalPayload = injectGlobalContext(payload);
+    var response;
+    var data;
 
-    var response = await fetch(config.restUrl, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-WP-Nonce': config.nonce || ''
-      },
-      body: JSON.stringify(finalPayload || {})
-    });
+    try {
+      response = await fetch(config.restUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': config.nonce || ''
+        },
+        body: JSON.stringify(finalPayload || {})
+      });
 
-    var data = await response.json().catch(function () {
-      return {};
-    });
+      data = await response.json().catch(function () {
+        return {};
+      });
+    } catch (networkError) {
+      pushDataLayerEvent('error', finalPayload, {
+        errorMessage: networkError && networkError.message ? networkError.message : 'Network error'
+      });
+      throw networkError;
+    }
 
     if (!response.ok) {
       var message = (data && data.message) ? data.message : 'Zoho request failed.';
+      pushDataLayerEvent('error', finalPayload, {
+        httpStatus: response.status,
+        errorMessage: message
+      });
       throw new Error(message);
     }
+
+    var zohoId = '';
+    if (data && data.response && data.response.data && data.response.data[0] && data.response.data[0].details) {
+      zohoId = asString(data.response.data[0].details.id || '');
+    }
+
+    pushDataLayerEvent('success', finalPayload, {
+      httpStatus: response.status,
+      zohoId: zohoId
+    });
 
     return data;
   }
