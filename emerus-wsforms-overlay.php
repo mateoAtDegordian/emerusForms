@@ -975,7 +975,8 @@ JS;
 
         $custom_js = trim((string) $options['ws_custom_js']);
         if ($custom_js !== '') {
-            wp_add_inline_script('emerus-wsforms-overlay', $custom_js, 'after');
+            $wrapped_custom_js = 'try { (new Function(' . wp_json_encode($custom_js) . '))(); } catch (e) { console.error("Emerus custom JS error:", e); }';
+            wp_add_inline_script('emerus-wsforms-overlay', $wrapped_custom_js, 'after');
         }
     }
 
