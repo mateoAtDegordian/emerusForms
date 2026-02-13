@@ -448,10 +448,197 @@
     return merged;
   }
 
+  function getSessionStore() {
+    try {
+      return window.sessionStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function normalizeParamKeys(keys) {
+    if (!Array.isArray(keys)) {
+      return ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+    }
+
+    var out = [];
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = asString(keys[i]).toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (key && out.indexOf(key) === -1) {
+        out.push(key);
+      }
+    }
+
+    if (out.length === 0) {
+      out.push('utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term');
+    }
+
+    return out;
+  }
+
+  function readParamsByKeys(urlString, keys) {
+    var data = {};
+    var parsed;
+
+    try {
+      parsed = new window.URL(urlString || window.location.href, window.location.origin);
+    } catch (e) {
+      parsed = null;
+    }
+
+    if (!parsed) {
+      return data;
+    }
+
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      var value = parsed.searchParams.get(key);
+      if (value !== null && asString(value).trim() !== '') {
+        data[key] = asString(value).trim();
+      }
+    }
+
+    return data;
+  }
+
+  function serializeFlatParams(data) {
+    var pairs = [];
+    var key;
+
+    for (key in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) {
+        continue;
+      }
+      if (asString(data[key]).trim() === '') {
+        continue;
+      }
+      pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(asString(data[key])));
+    }
+
+    return pairs.join('&');
+  }
+
+  function initSessionContext() {
+    var ctxConfig = config.globalContext && typeof config.globalContext === 'object' ? config.globalContext : {};
+    var store = getSessionStore();
+    var paramKeys = normalizeParamKeys(ctxConfig.utmKeys || []);
+    var currentUrl = window.location.href;
+    var currentTitle = document.title;
+    var currentParams = readParamsByKeys(currentUrl, paramKeys);
+    var firstUrl = currentUrl;
+    var firstTitle = currentTitle;
+    var firstParams = currentParams;
+
+    if (store) {
+      var storedUrl = store.getItem('emerus_first_session_url');
+      var storedTitle = store.getItem('emerus_first_session_title');
+      var storedParams = store.getItem('emerus_first_session_utm');
+
+      if (!storedUrl) {
+        store.setItem('emerus_first_session_url', currentUrl);
+      } else {
+        firstUrl = storedUrl;
+      }
+
+      if (!storedTitle) {
+        store.setItem('emerus_first_session_title', currentTitle);
+      } else {
+        firstTitle = storedTitle;
+      }
+
+      if (!storedParams) {
+        store.setItem('emerus_first_session_utm', JSON.stringify(currentParams));
+      } else {
+        try {
+          firstParams = JSON.parse(storedParams) || {};
+        } catch (e) {
+          firstParams = {};
+        }
+      }
+    }
+
+    return {
+      currentUrl: currentUrl,
+      currentTitle: currentTitle,
+      currentParams: currentParams,
+      firstUrl: firstUrl,
+      firstTitle: firstTitle,
+      firstParams: firstParams,
+      paramKeys: paramKeys
+    };
+  }
+
+  function appendRowIfMissing(rows, key, value) {
+    if (!Array.isArray(rows) || !key) {
+      return;
+    }
+
+    var normalizedKey = asString(key);
+    for (var i = 0; i < rows.length; i += 1) {
+      var row = rows[i];
+      if (row && asString(row.k) === normalizedKey) {
+        return;
+      }
+    }
+
+    rows.push({ k: normalizedKey, v: asString(value) });
+  }
+
+  function injectGlobalContext(payload) {
+    var ctxConfig = config.globalContext && typeof config.globalContext === 'object' ? config.globalContext : {};
+    if (!ctxConfig.enabled) {
+      return payload;
+    }
+
+    var context = initSessionContext();
+    var useFirstSession = !!ctxConfig.useFirstSession;
+    var landingValue = useFirstSession ? context.firstUrl : context.currentUrl;
+    var titleValue = context.currentTitle;
+    var utmData = useFirstSession ? context.firstParams : context.currentParams;
+    var utmValue = serializeFlatParams(utmData);
+
+    var landingField = asString(ctxConfig.landingField || '').trim();
+    var titleField = asString(ctxConfig.pageTitleField || '').trim();
+    var utmField = asString(ctxConfig.utmField || '').trim();
+
+    var finalPayload = payload && typeof payload === 'object' ? payload : {};
+    if (!finalPayload.lead || typeof finalPayload.lead !== 'object') {
+      finalPayload.lead = {};
+    }
+
+    if (landingField && typeof finalPayload.lead[landingField] === 'undefined') {
+      finalPayload.lead[landingField] = landingValue;
+    }
+    if (titleField && typeof finalPayload.lead[titleField] === 'undefined') {
+      finalPayload.lead[titleField] = titleValue;
+    }
+    if (utmField && utmValue && typeof finalPayload.lead[utmField] === 'undefined') {
+      finalPayload.lead[utmField] = utmValue;
+    }
+
+    if (!Array.isArray(finalPayload.rows)) {
+      finalPayload.rows = [];
+    }
+
+    if (landingField) {
+      appendRowIfMissing(finalPayload.rows, landingField, landingValue);
+    }
+    if (titleField) {
+      appendRowIfMissing(finalPayload.rows, titleField, titleValue);
+    }
+    if (utmField && utmValue) {
+      appendRowIfMissing(finalPayload.rows, utmField, utmValue);
+    }
+
+    return finalPayload;
+  }
+
   async function sendLead(payload) {
     if (!config.restUrl) {
       throw new Error('Zoho endpoint URL is missing.');
     }
+
+    var finalPayload = injectGlobalContext(payload);
 
     var response = await fetch(config.restUrl, {
       method: 'POST',
@@ -460,7 +647,7 @@
         'Content-Type': 'application/json',
         'X-WP-Nonce': config.nonce || ''
       },
-      body: JSON.stringify(payload || {})
+      body: JSON.stringify(finalPayload || {})
     });
 
     var data = await response.json().catch(function () {
@@ -559,6 +746,9 @@
       var lead = pairsToLead(rows);
       var staticLead = options && options.staticLead && typeof options.staticLead === 'object' ? options.staticLead : {};
       return mergeObjects(lead, staticLead);
+    },
+    getGlobalContext: function () {
+      return initSessionContext();
     }
   };
 

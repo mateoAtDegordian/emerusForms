@@ -21,6 +21,11 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 - Zoho helper for WS forms already on page:
   - `window.EmerusZoho.sendWsForm(form, options)`
   - Does not require plugin-injected overlay form
+- Global metadata injection for all helper submissions:
+  - `Landing Page` (first session URL)
+  - `Page Title`
+  - `UTM polja`
+  - Editable field API names in plugin options
 - Auto-injection in first hero-like Bricks section, fallback to fixed right panel
 - Optional Zoho CRM backend sending endpoint (disabled by default)
 
@@ -41,6 +46,7 @@ Self-injecting WordPress plugin for Bricks sites that renders WS Form as a right
 6. Optional: fill per-page title/subtitle override tables.
 7. Optional: add `WS default field rules by page`.
 8. Optional: enable `Load JS integration helpers on all frontend pages`.
+9. Optional: configure `Global Metadata Injection` field names and UTM keys.
 
 ## WS Field Defaults (Hidden Field Support)
 
@@ -92,6 +98,8 @@ await window.EmerusZoho.sendLead({
   lead
 });
 ```
+
+If `Global Metadata Injection` is enabled, `Landing Page`, `Page Title`, and `UTM polja` are appended automatically even when not present in the form.
 
 Alternative helper still available: `window.EmerusZoho.sendWsForm(form, options)`.
 

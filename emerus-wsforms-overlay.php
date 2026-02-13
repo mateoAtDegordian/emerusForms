@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.0
+ * Version: 0.3.1
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -226,6 +226,12 @@ JS;
             'ws_default_rules'           => '',
             'ws_custom_js'               => $this->default_custom_js_template(),
             'overlay_max_width'          => 420,
+            'global_context_enabled'     => 1,
+            'context_landing_field_api'  => 'Landing Page',
+            'context_page_title_field_api' => 'Page Title',
+            'context_utm_field_api'      => 'UTM polja',
+            'context_utm_keys'           => 'utm_source,utm_medium,utm_campaign,utm_content,utm_term,utm_id,gclid,fbclid,msclkid',
+            'context_use_first_session'  => 1,
             'zoho_enabled'               => 0,
             'zoho_client_id'             => '',
             'zoho_client_secret'         => '',
@@ -275,6 +281,12 @@ JS;
             'ws_default_rules'           => isset($raw['ws_default_rules']) ? sanitize_textarea_field($raw['ws_default_rules']) : $defaults['ws_default_rules'],
             'ws_custom_js'               => isset($raw['ws_custom_js']) ? $this->sanitize_custom_js($raw['ws_custom_js']) : $defaults['ws_custom_js'],
             'overlay_max_width'          => isset($raw['overlay_max_width']) ? max(280, min(640, absint($raw['overlay_max_width']))) : $defaults['overlay_max_width'],
+            'global_context_enabled'     => !empty($raw['global_context_enabled']) ? 1 : 0,
+            'context_landing_field_api'  => isset($raw['context_landing_field_api']) ? sanitize_text_field($raw['context_landing_field_api']) : $defaults['context_landing_field_api'],
+            'context_page_title_field_api' => isset($raw['context_page_title_field_api']) ? sanitize_text_field($raw['context_page_title_field_api']) : $defaults['context_page_title_field_api'],
+            'context_utm_field_api'      => isset($raw['context_utm_field_api']) ? sanitize_text_field($raw['context_utm_field_api']) : $defaults['context_utm_field_api'],
+            'context_utm_keys'           => isset($raw['context_utm_keys']) ? sanitize_text_field($raw['context_utm_keys']) : $defaults['context_utm_keys'],
+            'context_use_first_session'  => !empty($raw['context_use_first_session']) ? 1 : 0,
             'zoho_enabled'               => !empty($raw['zoho_enabled']) ? 1 : 0,
             'zoho_client_id'             => isset($raw['zoho_client_id']) ? sanitize_text_field($raw['zoho_client_id']) : $defaults['zoho_client_id'],
             'zoho_client_secret'         => isset($raw['zoho_client_secret']) ? sanitize_text_field($raw['zoho_client_secret']) : $defaults['zoho_client_secret'],
@@ -583,6 +595,47 @@ JS;
                     </tr>
                 </table>
 
+                <h2>Global Metadata Injection</h2>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row">Enable global metadata</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[global_context_enabled]" value="1" <?php checked((int) $options['global_context_enabled'], 1); ?> />
+                                Inject landing URL, page title and UTM data into Zoho payload globally.
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="context_landing_field_api">Landing URL field API</label></th>
+                        <td><input type="text" id="context_landing_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_landing_field_api]" value="<?php echo esc_attr($options['context_landing_field_api']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="context_page_title_field_api">Page title field API</label></th>
+                        <td><input type="text" id="context_page_title_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_page_title_field_api]" value="<?php echo esc_attr($options['context_page_title_field_api']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="context_utm_field_api">UTM field API</label></th>
+                        <td><input type="text" id="context_utm_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_utm_field_api]" value="<?php echo esc_attr($options['context_utm_field_api']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="context_utm_keys">Tracked UTM/param keys</label></th>
+                        <td>
+                            <input type="text" id="context_utm_keys" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_utm_keys]" value="<?php echo esc_attr($options['context_utm_keys']); ?>" class="large-text code" />
+                            <p class="description">Comma separated. Example: <code>utm_source,utm_medium,utm_campaign,utm_content,utm_term,utm_id,gclid,fbclid,msclkid</code></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Landing URL source</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_use_first_session]" value="1" <?php checked((int) $options['context_use_first_session'], 1); ?> />
+                                Use first session URL (recommended).
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+
                 <h2>Zoho CRM (optional, disabled by default)</h2>
                 <table class="form-table" role="presentation">
                     <tr>
@@ -671,6 +724,7 @@ JS;
                                 <li><code>staticLead</code>: extra fixed lead data always appended</li>
                                 <li><code>extraPayload</code>: extra top-level payload values</li>
                             </ul>
+                            <p class="description">Global injection (from plugin options) can auto-add <code>Landing Page</code>, <code>Page Title</code>, and <code>UTM polja</code> without WS form fields.</p>
                             <p class="description">JSON sent to backend stays aligned with your tested format (rows and/or lead object).</p>
                         </td>
                     </tr>
@@ -721,7 +775,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.0',
+            '0.3.1',
             true
         );
 
@@ -736,6 +790,14 @@ JS;
             'pageId'         => (int) get_queried_object_id(),
             'pageSlug'       => $page ? (string) $page->post_name : '',
             'wsDefaultRules' => $this->parse_ws_default_rules((string) $options['ws_default_rules']),
+            'globalContext'  => [
+                'enabled'         => (int) $options['global_context_enabled'] === 1,
+                'landingField'    => (string) $options['context_landing_field_api'],
+                'pageTitleField'  => (string) $options['context_page_title_field_api'],
+                'utmField'        => (string) $options['context_utm_field_api'],
+                'utmKeys'         => $this->parse_csv_keys((string) $options['context_utm_keys']),
+                'useFirstSession' => (int) $options['context_use_first_session'] === 1,
+            ],
         ]);
 
         $custom_js = trim((string) $options['ws_custom_js']);
@@ -1009,6 +1071,25 @@ JS;
         }
 
         return $rules;
+    }
+
+    private function parse_csv_keys($value) {
+        $parts = array_filter(array_map('trim', explode(',', (string) $value)));
+        $keys  = [];
+
+        foreach ($parts as $part) {
+            $part = strtolower(preg_replace('/[^a-z0-9_]/', '', $part));
+            if ($part === '') {
+                continue;
+            }
+            $keys[] = $part;
+        }
+
+        if (empty($keys)) {
+            $keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+        }
+
+        return array_values(array_unique($keys));
     }
 
     private function current_lang_code() {
