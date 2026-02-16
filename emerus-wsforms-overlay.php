@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.7
+ * Version: 0.3.8
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -1303,7 +1303,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.7'
+                '0.3.8'
             );
         }
 
@@ -1311,7 +1311,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.7',
+            '0.3.8',
             true
         );
 

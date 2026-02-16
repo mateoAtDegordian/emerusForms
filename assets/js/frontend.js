@@ -610,6 +610,10 @@
     var lang = getCurrentLangCode();
     var isHr = lang === 'hr';
     var prefix = asString(isHr ? privacy.prefixHr : privacy.prefixEn).trim();
+    if (prefix) {
+      // WP option sanitization trims trailing space; force exactly one separator before link.
+      prefix = prefix.replace(/\s+$/, '') + ' ';
+    }
     var linkText = asString(isHr ? privacy.linkTextHr : privacy.linkTextEn).trim();
     var url = asString(isHr ? privacy.urlHr : privacy.urlEn).trim();
     if (!url) {
