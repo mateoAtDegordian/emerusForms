@@ -983,6 +983,20 @@
     return pairs.join('&');
   }
 
+  function stripUrlParams(urlString) {
+    var raw = asString(urlString).trim();
+    if (!raw) {
+      return '';
+    }
+
+    try {
+      var parsed = new window.URL(raw, window.location.origin);
+      return parsed.origin + parsed.pathname;
+    } catch (e) {
+      return raw.split('#')[0].split('?')[0];
+    }
+  }
+
   function initSessionContext() {
     var ctxConfig = config.globalContext && typeof config.globalContext === 'object' ? config.globalContext : {};
     var store = getSessionStore();
@@ -1101,11 +1115,13 @@
 
     var context = initSessionContext();
     var useFirstSession = !!ctxConfig.useFirstSession;
-    var landingValue = useFirstSession ? context.firstUrl : context.currentUrl;
+    var landingValueRaw = useFirstSession ? context.firstUrl : context.currentUrl;
+    var landingValue = stripUrlParams(landingValueRaw);
     var titleValue = asString((payload && payload.page_title) ? payload.page_title : context.currentTitle);
     if (titleValue.indexOf('|') !== -1) {
       titleValue = asString(titleValue.split('|')[0]).trim();
     }
+    var pageUrlValue = asString((payload && payload.page_url) ? payload.page_url : context.currentUrl).trim();
     var utmData = hasNonEmptyParams(context.lastAttributionParams)
       ? context.lastAttributionParams
       : (useFirstSession ? context.firstParams : context.currentParams);
@@ -1114,6 +1130,7 @@
     var landingField = asString(ctxConfig.landingField || '').trim();
     var titleField = asString(ctxConfig.pageTitleField || '').trim();
     var utmField = asString(ctxConfig.utmField || '').trim();
+    var pageUrlField = asString(ctxConfig.pageUrlField || 'Page URL').trim();
 
     var finalPayload = payload && typeof payload === 'object' ? payload : {};
     if (!finalPayload.lead || typeof finalPayload.lead !== 'object') {
@@ -1129,6 +1146,9 @@
     if (utmField && utmValue && isEmptyOrPlaceholderValue(finalPayload.lead[utmField])) {
       finalPayload.lead[utmField] = utmValue;
     }
+    if (pageUrlField && isEmptyOrPlaceholderValue(finalPayload.lead[pageUrlField])) {
+      finalPayload.lead[pageUrlField] = pageUrlValue;
+    }
 
     if (!Array.isArray(finalPayload.rows)) {
       finalPayload.rows = [];
@@ -1142,6 +1162,9 @@
     }
     if (utmField && utmValue) {
       upsertRow(finalPayload.rows, utmField, utmValue);
+    }
+    if (pageUrlField) {
+      upsertRow(finalPayload.rows, pageUrlField, pageUrlValue);
     }
 
     return finalPayload;

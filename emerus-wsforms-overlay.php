@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.3
+ * Version: 0.4.4
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -125,6 +125,7 @@ https://wsform.com/knowledgebase/variables/#field
     'Proizvod/Usluga': '#field(PLACEHOLDER_PRODUCT_FIELD_ID, ", ")',
     // Leave these empty: plugin global context injects them automatically.
     'Landing Page': '',
+    'Page URL': '',
     'Page Title': '',
     'UTM polja': ''
   };
@@ -396,6 +397,7 @@ JS;
                 ['k' => 'Description', 'v' => 'Opis upita.'],
                 ['k' => 'Interes', 'v' => 'Industrijski profili'],
                 ['k' => 'Landing Page', 'v' => 'https://example.com/industrijski-profili'],
+                ['k' => 'Page URL', 'v' => 'https://example.com/industrijski-profili/prozor-sustav/'],
                 ['k' => 'Page Title', 'v' => 'Industrijski profili - Emerus'],
                 ['k' => 'UTM polja', 'v' => 'utm_source=google&utm_medium=cpc'],
                 ['k' => 'Proizvod/Usluga', 'v' => 'Industrijski profili'],
@@ -408,6 +410,7 @@ JS;
                 'Description'      => 'Opis upita.',
                 'Interes'          => 'Industrijski profili',
                 'Landing Page'     => 'https://example.com/industrijski-profili',
+                'Page URL'         => 'https://example.com/industrijski-profili/prozor-sustav/',
                 'Page Title'       => 'Industrijski profili - Emerus',
                 'UTM polja'        => 'utm_source=google&utm_medium=cpc',
                 'Proizvod/Usluga'  => 'Industrijski profili',
@@ -1182,7 +1185,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.4.3'
+                '0.4.4'
             );
         }
 
@@ -1190,7 +1193,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.4.3',
+            '0.4.4',
             true
         );
 
