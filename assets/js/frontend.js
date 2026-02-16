@@ -1469,6 +1469,12 @@
     }
   };
 
+  if (config.globalContext && config.globalContext.enabled) {
+    var bootContext = initSessionContext();
+    config.globalContextState = bootContext;
+    window.EmerusWsFormsOverlay = config;
+  }
+
   var wsI18nEnabled = getI18nRules().length > 0;
 
   if (root) {
