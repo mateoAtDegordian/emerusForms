@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.8
+ * Version: 0.3.9
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -78,7 +78,7 @@ https://wsform.com/knowledgebase/variables/#field
 1) Add this script to WS Form Action -> Run JavaScript.
 2) Replace placeholder field IDs inside #field(...).
 3) Keep this action early in order (before message / redirects).
-4) For payload preview only set dryRun = true.
+4) For payload preview only set dryRun = true (still applies global context + DataLayer preview event).
 */
 (async function () {
   if (!window.EmerusZoho || !window.EmerusZoho.sendLead) {
@@ -485,15 +485,24 @@ https://wsform.com/knowledgebase/variables/#field
       lead: finalLead
     };
 
+    if (dryRun) {
+      var previewPayload = payload;
+      if (window.EmerusZoho && typeof window.EmerusZoho.previewLead === 'function') {
+        previewPayload = window.EmerusZoho.previewLead(payload, { pushDataLayer: true, eventType: 'success' });
+      }
+      console.log('Emerus payload preview (dry run)', {
+        formId: cleanupValue('#form_id'),
+        formLabel: cleanupValue('#form_label'),
+        payload: previewPayload
+      });
+      return;
+    }
+
     console.log('Emerus payload preview', {
       formId: cleanupValue('#form_id'),
       formLabel: cleanupValue('#form_label'),
       payload: payload
     });
-
-    if (dryRun) {
-      return;
-    }
 
     await window.EmerusZoho.sendLead(payload);
   } catch (error) {
@@ -1303,7 +1312,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.8'
+                '0.3.9'
             );
         }
 
@@ -1311,7 +1320,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.8',
+            '0.3.9',
             true
         );
 

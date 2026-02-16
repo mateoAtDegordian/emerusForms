@@ -1146,6 +1146,9 @@
     if (metaObj.zohoId) {
       dlEvent.emerus_zoho_id = asString(metaObj.zohoId);
     }
+    if (metaObj.dryRun === true) {
+      dlEvent.emerus_dry_run = true;
+    }
 
     if (settings.includePayload) {
       dlEvent.emerus_payload = payloadObj;
@@ -1175,6 +1178,44 @@
     }
   }
 
+  function prepareLeadPayload(payload) {
+    var base = payload && typeof payload === 'object' ? payload : {};
+    var copy = {};
+    var key;
+
+    for (key in base) {
+      if (Object.prototype.hasOwnProperty.call(base, key)) {
+        copy[key] = base[key];
+      }
+    }
+
+    return injectGlobalContext(copy);
+  }
+
+  function previewLead(payload, options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    var finalPayload = prepareLeadPayload(payload);
+    var pushEnabled = opts.pushDataLayer !== false;
+    var eventType = opts.eventType === 'error' ? 'error' : 'success';
+    var meta = {
+      dryRun: true
+    };
+
+    if (opts.errorMessage) {
+      meta.errorMessage = asString(opts.errorMessage);
+    }
+
+    if (pushEnabled) {
+      pushDataLayerEvent(eventType, finalPayload, meta);
+    }
+
+    if (window.console && typeof window.console.log === 'function') {
+      window.console.log('Emerus final payload (dry run)', finalPayload);
+    }
+
+    return finalPayload;
+  }
+
   async function sendLead(payload) {
     if (!config.restUrl) {
       pushDataLayerEvent('error', payload, {
@@ -1183,7 +1224,7 @@
       throw new Error('Zoho endpoint URL is missing.');
     }
 
-    var finalPayload = injectGlobalContext(payload);
+    var finalPayload = prepareLeadPayload(payload);
     if (window.console && typeof window.console.log === 'function') {
       window.console.log('Emerus final payload', finalPayload);
     }
@@ -1319,6 +1360,7 @@
     endpoint: config.restUrl || '',
     nonce: config.nonce || '',
     sendLead: sendLead,
+    previewLead: previewLead,
     sendWsForm: sendWsForm,
     applyDefaults: function (formOrSelector, options) {
       return applyDefaults(formOrSelector, options || {});
