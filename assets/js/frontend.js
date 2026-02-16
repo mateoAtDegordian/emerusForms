@@ -1375,6 +1375,7 @@
     var finalPayload = prepareLeadPayload(payload);
     var pushEnabled = opts.pushDataLayer !== false;
     var eventType = opts.eventType === 'error' ? 'error' : 'success';
+    var backendPreviewEnabled = opts.backendPreview !== false;
     var meta = {
       dryRun: true
     };
@@ -1389,6 +1390,18 @@
 
     if (window.console && typeof window.console.log === 'function') {
       window.console.log('Emerus final payload (dry run)', finalPayload);
+    }
+
+    if (backendPreviewEnabled) {
+      previewBackendLead(finalPayload).then(function (result) {
+        if (window.console && typeof window.console.log === 'function') {
+          window.console.log('Emerus backend payload preview (dry run)', result);
+        }
+      }).catch(function (error) {
+        if (window.console && typeof window.console.error === 'function') {
+          window.console.error('Emerus backend payload preview failed:', error);
+        }
+      });
     }
 
     return finalPayload;
