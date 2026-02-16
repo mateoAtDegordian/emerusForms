@@ -873,6 +873,43 @@
     }
   }
 
+  function getLocalStore() {
+    try {
+      return window.localStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function parseStoredParamsJson(value) {
+    if (!value) {
+      return {};
+    }
+    try {
+      var parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function hasNonEmptyParams(data) {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    for (var key in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) {
+        continue;
+      }
+      if (asString(data[key]).trim() !== '') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function normalizeParamKeys(keys) {
     if (!Array.isArray(keys)) {
       return ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
@@ -938,6 +975,7 @@
   function initSessionContext() {
     var ctxConfig = config.globalContext && typeof config.globalContext === 'object' ? config.globalContext : {};
     var store = getSessionStore();
+    var localStore = getLocalStore();
     var paramKeys = normalizeParamKeys(ctxConfig.utmKeys || []);
     var currentUrl = window.location.href;
     var currentTitle = document.title;
@@ -945,6 +983,8 @@
     var firstUrl = currentUrl;
     var firstTitle = currentTitle;
     var firstParams = currentParams;
+    var lastAttributionUrl = '';
+    var lastAttributionParams = {};
 
     if (store) {
       var storedUrl = store.getItem('emerus_first_session_url');
@@ -966,11 +1006,36 @@
       if (!storedParams) {
         store.setItem('emerus_first_session_utm', JSON.stringify(currentParams));
       } else {
-        try {
-          firstParams = JSON.parse(storedParams) || {};
-        } catch (e) {
-          firstParams = {};
-        }
+        firstParams = parseStoredParamsJson(storedParams);
+      }
+    }
+
+    if (localStore) {
+      var storedLastUtmUrl = asString(localStore.getItem('emerus_last_utm_url') || '').trim();
+      var storedLastUtmParams = parseStoredParamsJson(localStore.getItem('emerus_last_utm_params'));
+
+      if (hasNonEmptyParams(currentParams)) {
+        localStore.setItem('emerus_last_utm_url', currentUrl);
+        localStore.setItem('emerus_last_utm_params', JSON.stringify(currentParams));
+        lastAttributionUrl = currentUrl;
+        lastAttributionParams = currentParams;
+      } else {
+        lastAttributionUrl = storedLastUtmUrl;
+        lastAttributionParams = storedLastUtmParams;
+      }
+    } else if (store) {
+      // Fallback for environments without localStorage.
+      var sessionLastUtmUrl = asString(store.getItem('emerus_last_utm_url') || '').trim();
+      var sessionLastUtmParams = parseStoredParamsJson(store.getItem('emerus_last_utm_params'));
+
+      if (hasNonEmptyParams(currentParams)) {
+        store.setItem('emerus_last_utm_url', currentUrl);
+        store.setItem('emerus_last_utm_params', JSON.stringify(currentParams));
+        lastAttributionUrl = currentUrl;
+        lastAttributionParams = currentParams;
+      } else {
+        lastAttributionUrl = sessionLastUtmUrl;
+        lastAttributionParams = sessionLastUtmParams;
       }
     }
 
@@ -981,6 +1046,8 @@
       firstUrl: firstUrl,
       firstTitle: firstTitle,
       firstParams: firstParams,
+      lastAttributionUrl: lastAttributionUrl,
+      lastAttributionParams: lastAttributionParams,
       paramKeys: paramKeys
     };
   }
@@ -1017,7 +1084,9 @@
     if (titleValue.indexOf('|') !== -1) {
       titleValue = asString(titleValue.split('|')[0]).trim();
     }
-    var utmData = useFirstSession ? context.firstParams : context.currentParams;
+    var utmData = hasNonEmptyParams(context.lastAttributionParams)
+      ? context.lastAttributionParams
+      : (useFirstSession ? context.firstParams : context.currentParams);
     var utmValue = serializeFlatParams(utmData);
 
     var landingField = asString(ctxConfig.landingField || '').trim();
@@ -1094,7 +1163,6 @@
 
     addName(objectName);
     addName('dataLayer');
-    addName('datalayer');
 
     for (var i = 0; i < names.length; i += 1) {
       var name = names[i];
@@ -1168,13 +1236,6 @@
       }
       seenRefs.push(target.ref);
       target.ref.push(dlEvent);
-      if (window.console && typeof window.console.log === 'function') {
-        window.console.log('Emerus DataLayer push', {
-          layer: target.name,
-          event: dlEvent.event,
-          status: dlEvent.emerus_status
-        });
-      }
     }
   }
 
