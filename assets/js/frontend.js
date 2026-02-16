@@ -985,28 +985,39 @@
     var firstParams = currentParams;
     var lastAttributionUrl = '';
     var lastAttributionParams = {};
+    var currentHasUtm = hasNonEmptyParams(currentParams);
 
     if (store) {
       var storedUrl = store.getItem('emerus_first_session_url');
       var storedTitle = store.getItem('emerus_first_session_title');
       var storedParams = store.getItem('emerus_first_session_utm');
 
-      if (!storedUrl) {
+      // Reset first-session attribution whenever a new UTM hit is detected.
+      if (currentHasUtm) {
         store.setItem('emerus_first_session_url', currentUrl);
-      } else {
-        firstUrl = storedUrl;
-      }
-
-      if (!storedTitle) {
         store.setItem('emerus_first_session_title', currentTitle);
-      } else {
-        firstTitle = storedTitle;
-      }
-
-      if (!storedParams) {
         store.setItem('emerus_first_session_utm', JSON.stringify(currentParams));
+        firstUrl = currentUrl;
+        firstTitle = currentTitle;
+        firstParams = currentParams;
       } else {
-        firstParams = parseStoredParamsJson(storedParams);
+        if (!storedUrl) {
+          store.setItem('emerus_first_session_url', currentUrl);
+        } else {
+          firstUrl = storedUrl;
+        }
+
+        if (!storedTitle) {
+          store.setItem('emerus_first_session_title', currentTitle);
+        } else {
+          firstTitle = storedTitle;
+        }
+
+        if (!storedParams) {
+          store.setItem('emerus_first_session_utm', JSON.stringify(currentParams));
+        } else {
+          firstParams = parseStoredParamsJson(storedParams);
+        }
       }
     }
 
