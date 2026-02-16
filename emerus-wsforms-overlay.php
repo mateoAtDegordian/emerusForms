@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.5
+ * Version: 0.4.6
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -111,6 +111,46 @@ https://wsform.com/knowledgebase/variables/#field
     { pattern: '#^/hr/gradevinski-sustavi/#i', value: 'Građevinski sustavi' },
     { pattern: '#^/hr/solarni-sustavi/#i', value: 'Solarni sustavi' },
     { pattern: '#^/hr/industrijski-profili/#i', value: 'Industrijski profili' }
+  ];
+
+  // Explicit slug to Croatian product/service title mapping.
+  // Longest slug match wins (child page beats parent).
+  var productPathHrMap = [
+    { slug: '/building-systems/entrance-door/', value: 'Ulazna vrata' },
+    { slug: '/building-systems/facade-systems/', value: 'Fasadni sustavi' },
+    { slug: '/building-systems/fencing-systems/', value: 'Ogradni sustavi' },
+    { slug: '/building-systems/sliding-systems/', value: 'Klizni sustavi' },
+    { slug: '/building-systems/sun-protection/', value: 'Zaštita od sunca' },
+    { slug: '/building-systems/windows-and-doors/', value: 'Prozori i vrata' },
+    { slug: '/building-systems/', value: 'Građevinski sustavi' },
+
+    { slug: '/hr/gradevinski-sustavi/fasadni-sustavi/', value: 'Fasadni sustavi' },
+    { slug: '/hr/gradevinski-sustavi/klizni-sustavi/', value: 'Klizni sustavi' },
+    { slug: '/hr/gradevinski-sustavi/ogradni-sustavi/', value: 'Ogradni sustavi' },
+    { slug: '/hr/gradevinski-sustavi/prozori-i-vrata/', value: 'Prozori i vrata' },
+    { slug: '/hr/gradevinski-sustavi/ulazna-vrata/', value: 'Ulazna vrata' },
+    { slug: '/hr/gradevinski-sustavi/zastita-od-sunca/', value: 'Zaštita od sunca' },
+    { slug: '/hr/gradevinski-sustavi/', value: 'Građevinski sustavi' },
+
+    { slug: '/hr/industrijski-profili/rjesenja-po-mjeri/', value: 'Rješenja po mjeri' },
+    { slug: '/hr/industrijski-profili/standarni-profili/', value: 'Standarni profili' },
+    { slug: '/hr/industrijski-profili/', value: 'Industrijski profili' },
+
+    { slug: '/hr/solarni-sustavi/crijepni-krov/', value: 'Crijepni krov' },
+    { slug: '/hr/solarni-sustavi/kosi-industrijski-krov/', value: 'Kosi industrijski krov' },
+    { slug: '/hr/solarni-sustavi/podni-sustavi/', value: 'Podni sustavi' },
+    { slug: '/hr/solarni-sustavi/ravni-krov/', value: 'Ravni krov' },
+    { slug: '/hr/solarni-sustavi/', value: 'Solarni sustavi' },
+
+    { slug: '/industrial-profiles/customized-solutions/', value: 'Rješenja po mjeri' },
+    { slug: '/industrial-profiles/standard-profiles/', value: 'Standarni profili' },
+    { slug: '/industrial-profiles/', value: 'Industrijski profili' },
+
+    { slug: '/solar-systems/flat-roof/', value: 'Ravni krov' },
+    { slug: '/solar-systems/floor-systems/', value: 'Podni sustavi' },
+    { slug: '/solar-systems/sloping-industrial-roof/', value: 'Kosi industrijski krov' },
+    { slug: '/solar-systems/tiled-roof/', value: 'Crijepni krov' },
+    { slug: '/solar-systems/', value: 'Solarni sustavi' }
   ];
 
   // Replace placeholders with WS field IDs from builder (e.g. 351, 352, 353...).
@@ -278,6 +318,40 @@ https://wsform.com/knowledgebase/variables/#field
     return '';
   }
 
+  function inferCroatianProductByPath() {
+    var path = '';
+    try {
+      path = normalizePath(window.location.pathname || '');
+    } catch (e) {
+      path = '';
+    }
+
+    if (!path) {
+      return '';
+    }
+
+    var best = '';
+    var bestLen = 0;
+
+    for (var i = 0; i < productPathHrMap.length; i += 1) {
+      var item = productPathHrMap[i] || {};
+      var slug = normalizePath(item.slug || '');
+      var value = cleanupValue(item.value || '');
+      if (!slug || !value) {
+        continue;
+      }
+
+      if (path === slug || path.indexOf(slug) === 0) {
+        if (slug.length > bestLen) {
+          bestLen = slug.length;
+          best = value;
+        }
+      }
+    }
+
+    return best;
+  }
+
   try {
     var finalLead = {};
     var keys = Object.keys(lead);
@@ -306,11 +380,14 @@ https://wsform.com/knowledgebase/variables/#field
 
     var interestMode = norm(interestSourceMode).toLowerCase();
     var pathInterest = inferInterestFromPath();
+    var pathProductHr = inferCroatianProductByPath();
     var isMappedPath = !!pathInterest;
 
-    // Auto-fill Proizvod/Usluga only on mapped parent paths.
-    if (!finalLead['Proizvod/Usluga'] && isMappedPath) {
-      finalLead['Proizvod/Usluga'] = pageShortTitle || pathInterest;
+    // Always force Croatian Proizvod/Usluga value when current path is mapped.
+    if (pathProductHr) {
+      finalLead['Proizvod/Usluga'] = pathProductHr;
+    } else if (!finalLead['Proizvod/Usluga'] && isMappedPath) {
+      finalLead['Proizvod/Usluga'] = pathInterest;
     }
 
     if (interestMode === 'path') {
@@ -353,14 +430,13 @@ https://wsform.com/knowledgebase/variables/#field
       form_key: inferFormKey(),
       page_url: cleanupValue('#tracking_url') || window.location.href,
       page_title: pageShortTitle || cleanupValue('#post_title') || document.title,
+      sub_source: '',
       rows: rows,
       lead: finalLead
     };
 
     var customSubSourceClean = cleanupValue(customSubSource);
-    if (customSubSourceClean) {
-      payload.sub_source = customSubSourceClean;
-    }
+    payload.sub_source = customSubSourceClean;
 
     if (dryRun) {
       var previewPayload = payload;
@@ -393,6 +469,7 @@ JS;
         $template = [
             'form_variant' => 'product',
             'form_key'     => 'services_products_en',
+            'sub_source'   => 'Footer newsletter',
             'page_url'     => 'https://example.com/industrijski-profili',
             'page_title'   => 'Industrijski profili - Emerus',
             'rows'         => [
@@ -1191,7 +1268,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.4.5'
+                '0.4.6'
             );
         }
 
@@ -1199,7 +1276,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.4.5',
+            '0.4.6',
             true
         );
 
