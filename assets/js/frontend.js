@@ -911,20 +911,22 @@
   }
 
   function normalizeParamKeys(keys) {
+    var allowedKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+
     if (!Array.isArray(keys)) {
-      return ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      return allowedKeys.slice();
     }
 
     var out = [];
     for (var i = 0; i < keys.length; i += 1) {
       var key = asString(keys[i]).toLowerCase().replace(/[^a-z0-9_]/g, '');
-      if (key && out.indexOf(key) === -1) {
+      if (allowedKeys.indexOf(key) !== -1 && out.indexOf(key) === -1) {
         out.push(key);
       }
     }
 
     if (out.length === 0) {
-      out.push('utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term');
+      out = allowedKeys.slice();
     }
 
     return out;
@@ -949,6 +951,15 @@
       var value = parsed.searchParams.get(key);
       if (value !== null && asString(value).trim() !== '') {
         data[key] = asString(value).trim();
+      }
+    }
+
+    // If there are no classic UTM params, derive only utm_source from click IDs.
+    if (!hasNonEmptyParams(data)) {
+      if (asString(parsed.searchParams.get('gclid') || '').trim() !== '') {
+        data.utm_source = 'google';
+      } else if (asString(parsed.searchParams.get('fbclid') || '').trim() !== '') {
+        data.utm_source = 'fb';
       }
     }
 

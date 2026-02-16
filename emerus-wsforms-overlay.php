@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.1
+ * Version: 0.4.2
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -456,7 +456,7 @@ JS;
             'context_landing_field_api'  => 'Landing Page',
             'context_page_title_field_api' => 'Page Title',
             'context_utm_field_api'      => 'UTM polja',
-            'context_utm_keys'           => 'utm_source,utm_medium,utm_campaign,utm_content,utm_term,utm_id,gclid,fbclid,msclkid',
+            'context_utm_keys'           => 'utm_source,utm_medium,utm_campaign,utm_content,utm_term',
             'context_use_first_session'  => 1,
             'datalayer_enabled'          => 1,
             'datalayer_object_name'      => 'dataLayer',
@@ -990,7 +990,7 @@ JS;
                         <th scope="row"><label for="context_utm_keys">Tracked UTM/param keys</label></th>
                         <td>
                             <input type="text" id="context_utm_keys" name="<?php echo esc_attr(self::OPTION_KEY); ?>[context_utm_keys]" value="<?php echo esc_attr($options['context_utm_keys']); ?>" class="large-text code" />
-                            <p class="description">Comma separated. Example: <code>utm_source,utm_medium,utm_campaign,utm_content,utm_term,utm_id,gclid,fbclid,msclkid</code></p>
+                            <p class="description">Comma separated. Classic UTM only. Example: <code>utm_source,utm_medium,utm_campaign,utm_content,utm_term</code>. If only <code>gclid</code> or <code>fbclid</code> exists, plugin sets <code>utm_source=google</code> or <code>utm_source=fb</code>.</p>
                         </td>
                     </tr>
                     <tr>
@@ -1182,7 +1182,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.4.1'
+                '0.4.2'
             );
         }
 
@@ -1190,7 +1190,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.4.1',
+            '0.4.2',
             true
         );
 
