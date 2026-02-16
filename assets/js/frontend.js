@@ -1009,7 +1009,10 @@
     var context = initSessionContext();
     var useFirstSession = !!ctxConfig.useFirstSession;
     var landingValue = useFirstSession ? context.firstUrl : context.currentUrl;
-    var titleValue = context.currentTitle;
+    var titleValue = asString((payload && payload.page_title) ? payload.page_title : context.currentTitle);
+    if (titleValue.indexOf('|') !== -1) {
+      titleValue = asString(titleValue.split('|')[0]).trim();
+    }
     var utmData = useFirstSession ? context.firstParams : context.currentParams;
     var utmValue = serializeFlatParams(utmData);
 
@@ -1091,7 +1094,7 @@
 
     for (var i = 0; i < names.length; i += 1) {
       var name = names[i];
-      if (!window[name] || !Array.isArray(window[name])) {
+      if (!window[name] || typeof window[name].push !== 'function') {
         window[name] = [];
       }
       out.push({
@@ -1150,7 +1153,7 @@
 
     for (var t = 0; t < targets.length; t += 1) {
       var target = targets[t];
-      if (!target || !Array.isArray(target.ref)) {
+      if (!target || !target.ref || typeof target.ref.push !== 'function') {
         continue;
       }
       if (seenRefs.indexOf(target.ref) !== -1) {
@@ -1158,6 +1161,13 @@
       }
       seenRefs.push(target.ref);
       target.ref.push(dlEvent);
+      if (window.console && typeof window.console.log === 'function') {
+        window.console.log('Emerus DataLayer push', {
+          layer: target.name,
+          event: dlEvent.event,
+          status: dlEvent.emerus_status
+        });
+      }
     }
   }
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.6
+ * Version: 0.3.7
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -192,6 +192,43 @@ https://wsform.com/knowledgebase/variables/#field
     return norm(title.split('|')[0]);
   }
 
+  function getSessionStore() {
+    try {
+      return window.sessionStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function parseStoredUtmValue(value) {
+    var raw = norm(value);
+    if (!raw) {
+      return '';
+    }
+
+    // Compatibility with global helper storage (JSON object of params).
+    if (raw.charAt(0) === '{') {
+      try {
+        var obj = JSON.parse(raw);
+        var keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'gclid', 'fbclid', 'msclkid'];
+        var out = [];
+        for (var i = 0; i < keys.length; i += 1) {
+          var key = keys[i];
+          var val = norm(obj && obj[key] ? obj[key] : '');
+          if (!val) {
+            continue;
+          }
+          out.push(key + '=' + encodeURIComponent(val));
+        }
+        return out.join('&');
+      } catch (e) {
+        return '';
+      }
+    }
+
+    return raw;
+  }
+
   function inferUtmFromLocation() {
     var keys = [
       'utm_source',
@@ -249,6 +286,41 @@ https://wsform.com/knowledgebase/variables/#field
     }
 
     return out.join('&');
+  }
+
+  function getFirstTouchContext() {
+    var currentUrl = window.location.href;
+    var currentUtm = inferUtmFromLocation();
+    var firstUrl = currentUrl;
+    var firstUtm = currentUtm;
+    var store = getSessionStore();
+
+    if (!store) {
+      return {
+        firstUrl: firstUrl,
+        firstUtm: firstUtm
+      };
+    }
+
+    var storedUrl = norm(store.getItem('emerus_first_session_url'));
+    if (!storedUrl) {
+      store.setItem('emerus_first_session_url', currentUrl);
+      storedUrl = currentUrl;
+    }
+
+    var storedUtm = parseStoredUtmValue(store.getItem('emerus_first_session_utm'));
+    if (!storedUtm && currentUtm) {
+      store.setItem('emerus_first_session_utm', currentUtm);
+      storedUtm = currentUtm;
+    }
+
+    firstUrl = storedUrl || currentUrl;
+    firstUtm = storedUtm || currentUtm;
+
+    return {
+      firstUrl: firstUrl,
+      firstUtm: firstUtm
+    };
   }
 
   function inferFormKey() {
@@ -347,12 +419,27 @@ https://wsform.com/knowledgebase/variables/#field
       finalLead[key] = value;
     }
 
-    if (!finalLead['Proizvod/Usluga']) {
-      finalLead['Proizvod/Usluga'] = inferProductServiceFromPage();
+    var pageShortTitle = inferProductServiceFromPage();
+    var firstTouch = getFirstTouchContext();
+
+    if (!finalLead['Landing Page']) {
+      finalLead['Landing Page'] = firstTouch.firstUrl || window.location.href;
+    }
+    if (!finalLead['Page Title']) {
+      finalLead['Page Title'] = pageShortTitle || cleanupValue('#post_title') || document.title;
+    }
+    if (!finalLead['UTM polja']) {
+      finalLead['UTM polja'] = firstTouch.firstUtm || inferUtmFromLocation();
     }
 
     var interestMode = norm(interestSourceMode).toLowerCase();
     var pathInterest = inferInterestFromPath();
+    var isMappedPath = !!pathInterest;
+
+    // Auto-fill Proizvod/Usluga only on mapped parent paths.
+    if (!finalLead['Proizvod/Usluga'] && isMappedPath) {
+      finalLead['Proizvod/Usluga'] = pageShortTitle || pathInterest;
+    }
 
     if (interestMode === 'path') {
       if (pathInterest) {
@@ -1216,7 +1303,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.6'
+                '0.3.7'
             );
         }
 
@@ -1224,7 +1311,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.6',
+            '0.3.7',
             true
         );
 
