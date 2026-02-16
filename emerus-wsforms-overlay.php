@@ -1808,19 +1808,22 @@ JS;
             $lead[$source_field] = (string) $options['zoho_lead_source'];
         }
 
+        $payload_sub_source = '';
+        if (isset($payload['sub_source'])) {
+            $payload_sub_source = sanitize_text_field((string) $payload['sub_source']);
+        } elseif (isset($payload['lead_sub_source'])) {
+            $payload_sub_source = sanitize_text_field((string) $payload['lead_sub_source']);
+        }
+        $resolved_sub_source = $payload_sub_source !== ''
+            ? $payload_sub_source
+            : $this->resolve_sub_source_value($payload, $variant, $options);
+
         $sub_source_field = trim((string) $options['zoho_sub_source_field_api']);
         if ($sub_source_field !== '') {
-            $payload_sub_source = '';
-            if (isset($payload['sub_source'])) {
-                $payload_sub_source = sanitize_text_field((string) $payload['sub_source']);
-            } elseif (isset($payload['lead_sub_source'])) {
-                $payload_sub_source = sanitize_text_field((string) $payload['lead_sub_source']);
-            }
-
             if ($payload_sub_source !== '') {
                 $lead[$sub_source_field] = $payload_sub_source;
             } elseif (empty($lead[$sub_source_field])) {
-                $lead[$sub_source_field] = $this->resolve_sub_source_value($payload, $variant, $options);
+                $lead[$sub_source_field] = $resolved_sub_source;
             }
         }
 
@@ -1847,6 +1850,12 @@ JS;
                 'previewOnly' => true,
                 'apiUrl'      => $api_url,
                 'request'     => $zoho_request,
+                'debug'       => [
+                    'variant'           => $variant,
+                    'subSourceFieldApi' => $sub_source_field,
+                    'payloadSubSource'  => $payload_sub_source,
+                    'resolvedSubSource' => $resolved_sub_source,
+                ],
             ], 200);
         }
 
