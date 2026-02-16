@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.2
+ * Version: 0.3.5
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -89,15 +89,27 @@ https://wsform.com/knowledgebase/variables/#field
   var manualFormKey = ''; // optional override, e.g. services_products_en
   var dryRun = false; // true = log payload only
   var customInterestValue = ''; // optional hard override (if set, always used as fallback)
+  // Interest source mode per form:
+  // auto = form value first, then URL mapping fallback
+  // form = only form value (no URL fallback)
+  // path = always URL mapping (ignores form value for Interes)
+  var interestSourceMode = 'auto'; // auto | form | path
 
-  // Explicit slug rules: both HR and EN URLs map to HR Zoho values.
+  // Explicit URL regex rules: both HR and EN URLs map to HR Zoho values.
+  // Parent path match (children included), as requested:
+  // #^/solar-systems/#
+  // #^/building-systems/#
+  // #^/industrial-profiles/#
+  // #^/hr/gradevinski-sustavi/#
+  // #^/hr/solarni-sustavi/#
+  // #^/hr/industrijski-profili/#
   var interestPathRules = [
-    { slug: '/hr/industrijski-profili/', value: 'Industrijski profili' },
-    { slug: '/industrial-profiles/', value: 'Industrijski profili' },
-    { slug: '/hr/solarni-sustavi/', value: 'Solarni sustavi' },
-    { slug: '/solar-systems/', value: 'Solarni sustavi' },
-    { slug: '/hr/gradevinski-sustavi/', value: 'Građevinski sustavi' },
-    { slug: '/building-systems/', value: 'Građevinski sustavi' }
+    { pattern: '#^/solar-systems/#i', value: 'Solarni sustavi' },
+    { pattern: '#^/building-systems/#i', value: 'Građevinski sustavi' },
+    { pattern: '#^/industrial-profiles/#i', value: 'Industrijski profili' },
+    { pattern: '#^/hr/gradevinski-sustavi/#i', value: 'Građevinski sustavi' },
+    { pattern: '#^/hr/solarni-sustavi/#i', value: 'Solarni sustavi' },
+    { pattern: '#^/hr/industrijski-profili/#i', value: 'Industrijski profili' }
   ];
 
   // Replace placeholders with WS field IDs from builder (e.g. 351, 352, 353...).
@@ -108,11 +120,13 @@ https://wsform.com/knowledgebase/variables/#field
     Email: '#field(PLACEHOLDER_EMAIL_FIELD_ID)',
     Phone: '#field(PLACEHOLDER_PHONE_FIELD_ID)',
     Description: '#field(PLACEHOLDER_DESCRIPTION_FIELD_ID)',
+    // For select / multiselect use #field(ID, ", ")
     Interes: '#field(PLACEHOLDER_INTEREST_FIELD_ID, ", ")',
     'Proizvod/Usluga': '#field(PLACEHOLDER_PRODUCT_FIELD_ID, ", ")',
-    'Landing Page': '#tracking_url',
-    'Page Title': '#post_title',
-    'UTM polja': 'utm_source=#tracking_utm_source&utm_medium=#tracking_utm_medium&utm_campaign=#tracking_utm_campaign&utm_term=#tracking_utm_term&utm_content=#tracking_utm_content'
+    // Leave these empty: plugin global context injects them automatically.
+    'Landing Page': '',
+    'Page Title': '',
+    'UTM polja': ''
   };
 
   function norm(value) {
@@ -127,6 +141,9 @@ https://wsform.com/knowledgebase/variables/#field
   function cleanupValue(value) {
     var v = norm(value);
     if (!v) {
+      return '';
+    }
+    if (/^[\s"',\\()[\],.-]+$/.test(v)) {
       return '';
     }
     if (v.indexOf('PLACEHOLDER_') !== -1) {
@@ -189,19 +206,34 @@ https://wsform.com/knowledgebase/variables/#field
       path = '/' + path;
     }
     path = path.replace(/\/+/g, '/');
-    if (path.length > 1 && path.charAt(path.length - 1) === '/') {
-      path = path.slice(0, -1);
+    if (path.charAt(path.length - 1) !== '/') {
+      path += '/';
     }
     return path;
   }
 
-  function pathMatchesRule(path, slug) {
+  function pathMatchesRule(path, regexPattern) {
     var current = normalizePath(path);
-    var rule = normalizePath(slug);
-    if (!rule || rule === '/') {
+    var pattern = norm(regexPattern);
+    if (!pattern) {
       return false;
     }
-    return current === rule || current.indexOf(rule + '/') === 0;
+
+    try {
+      // Pattern style: #^/building-systems/#i
+      if (pattern.charAt(0) === '#') {
+        var lastHash = pattern.lastIndexOf('#');
+        if (lastHash > 0) {
+          var body = pattern.slice(1, lastHash);
+          var flags = pattern.slice(lastHash + 1);
+          return new RegExp(body, flags).test(current);
+        }
+      }
+      // Fallback: treat as plain regex body, case-insensitive.
+      return new RegExp(pattern, 'i').test(current);
+    } catch (e) {
+      return false;
+    }
   }
 
   function inferInterestFromPath() {
@@ -222,7 +254,7 @@ https://wsform.com/knowledgebase/variables/#field
 
     for (var i = 0; i < interestPathRules.length; i += 1) {
       var rule = interestPathRules[i] || {};
-      if (pathMatchesRule(path, rule.slug || '')) {
+      if (pathMatchesRule(path, rule.pattern || '')) {
         return cleanupValue(rule.value || '');
       }
     }
@@ -239,11 +271,30 @@ https://wsform.com/knowledgebase/variables/#field
       finalLead[key] = value;
     }
 
-    if (!finalLead.Interes) {
-      finalLead.Interes = inferInterestFromPath();
-    }
-    if (!finalLead['Proizvod/Usluga'] && finalLead.Interes) {
-      finalLead['Proizvod/Usluga'] = finalLead.Interes;
+    var interestMode = norm(interestSourceMode).toLowerCase();
+    var pathInterest = inferInterestFromPath();
+
+    if (interestMode === 'path') {
+      if (pathInterest) {
+        finalLead.Interes = pathInterest;
+      }
+      if (!finalLead['Proizvod/Usluga'] && finalLead.Interes) {
+        finalLead['Proizvod/Usluga'] = finalLead.Interes;
+      }
+    } else if (interestMode === 'form') {
+      if (!finalLead.Interes && finalLead['Proizvod/Usluga']) {
+        finalLead.Interes = finalLead['Proizvod/Usluga'];
+      }
+    } else {
+      if (!finalLead.Interes && finalLead['Proizvod/Usluga']) {
+        finalLead.Interes = finalLead['Proizvod/Usluga'];
+      }
+      if (!finalLead.Interes && pathInterest) {
+        finalLead.Interes = pathInterest;
+      }
+      if (!finalLead['Proizvod/Usluga'] && finalLead.Interes) {
+        finalLead['Proizvod/Usluga'] = finalLead.Interes;
+      }
     }
 
     if (!finalLead.Last_Name) {
@@ -861,7 +912,7 @@ JS;
                             </label>
                             <br /><br />
                             <textarea id="ws_custom_js" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ws_custom_js]" rows="10" class="large-text code"><?php echo esc_textarea($options['ws_custom_js']); ?></textarea>
-                            <p class="description">Runs after plugin JS only when enabled. You can listen to event <code>emerus-ws-defaults-applied</code> and adjust form behavior.</p>
+                            <p class="description">Runs after plugin JS only when enabled. You can listen to event <code>emerus-ws-defaults-applied</code> and adjust form behavior. This is separate from the long read-only <code>WS submit JS template</code> shown below.</p>
                         </td>
                     </tr>
                 </table>
@@ -1085,7 +1136,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.4'
+                '0.3.5'
             );
         }
 
@@ -1093,7 +1144,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.4',
+            '0.3.5',
             true
         );
 

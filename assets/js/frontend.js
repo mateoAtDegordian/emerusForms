@@ -23,6 +23,19 @@
     return String(value);
   }
 
+  function isEmptyOrPlaceholderValue(value) {
+    var normalized = asString(value).trim();
+    if (!normalized) {
+      return true;
+    }
+
+    if (normalized.indexOf('PLACEHOLDER_') !== -1) {
+      return true;
+    }
+
+    return /^#(?:tracking_|field\(|form_|post_|query_var\()/i.test(normalized);
+  }
+
   function getCurrentVariant() {
     if (root) {
       return asString(root.getAttribute('data-variant') || 'hero');
@@ -968,7 +981,7 @@
     };
   }
 
-  function appendRowIfMissing(rows, key, value) {
+  function upsertRow(rows, key, value) {
     if (!Array.isArray(rows) || !key) {
       return;
     }
@@ -977,6 +990,9 @@
     for (var i = 0; i < rows.length; i += 1) {
       var row = rows[i];
       if (row && asString(row.k) === normalizedKey) {
+        if (isEmptyOrPlaceholderValue(row.v)) {
+          row.v = asString(value);
+        }
         return;
       }
     }
@@ -1006,13 +1022,13 @@
       finalPayload.lead = {};
     }
 
-    if (landingField && typeof finalPayload.lead[landingField] === 'undefined') {
+    if (landingField && isEmptyOrPlaceholderValue(finalPayload.lead[landingField])) {
       finalPayload.lead[landingField] = landingValue;
     }
-    if (titleField && typeof finalPayload.lead[titleField] === 'undefined') {
+    if (titleField && isEmptyOrPlaceholderValue(finalPayload.lead[titleField])) {
       finalPayload.lead[titleField] = titleValue;
     }
-    if (utmField && utmValue && typeof finalPayload.lead[utmField] === 'undefined') {
+    if (utmField && utmValue && isEmptyOrPlaceholderValue(finalPayload.lead[utmField])) {
       finalPayload.lead[utmField] = utmValue;
     }
 
@@ -1021,13 +1037,13 @@
     }
 
     if (landingField) {
-      appendRowIfMissing(finalPayload.rows, landingField, landingValue);
+      upsertRow(finalPayload.rows, landingField, landingValue);
     }
     if (titleField) {
-      appendRowIfMissing(finalPayload.rows, titleField, titleValue);
+      upsertRow(finalPayload.rows, titleField, titleValue);
     }
     if (utmField && utmValue) {
-      appendRowIfMissing(finalPayload.rows, utmField, utmValue);
+      upsertRow(finalPayload.rows, utmField, utmValue);
     }
 
     return finalPayload;
@@ -1063,7 +1079,7 @@
 
   function pushDataLayerEvent(type, payload, meta) {
     var settings = config.dataLayer && typeof config.dataLayer === 'object' ? config.dataLayer : {};
-    if (!settings.enabled) {
+    if (settings.enabled === false || settings.enabled === 0 || settings.enabled === '0') {
       return;
     }
 
@@ -1108,6 +1124,9 @@
 
   async function sendLead(payload) {
     if (!config.restUrl) {
+      pushDataLayerEvent('error', payload, {
+        errorMessage: 'Zoho endpoint URL is missing.'
+      });
       throw new Error('Zoho endpoint URL is missing.');
     }
 
