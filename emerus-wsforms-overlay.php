@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.3.5
+ * Version: 0.3.6
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -178,6 +178,79 @@ https://wsform.com/knowledgebase/variables/#field
     return out.join('&');
   }
 
+  function inferProductServiceFromPage() {
+    var postTitle = cleanupValue('#post_title');
+    if (postTitle) {
+      return postTitle;
+    }
+
+    var title = norm(document.title);
+    if (!title) {
+      return '';
+    }
+
+    return norm(title.split('|')[0]);
+  }
+
+  function inferUtmFromLocation() {
+    var keys = [
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
+      'utm_id',
+      'gclid',
+      'fbclid',
+      'msclkid'
+    ];
+    var params = {};
+    var i;
+
+    // Prefer explicit WS tracking variables when resolved.
+    var wsTracking = {
+      utm_source: cleanupValue('#tracking_utm_source'),
+      utm_medium: cleanupValue('#tracking_utm_medium'),
+      utm_campaign: cleanupValue('#tracking_utm_campaign'),
+      utm_term: cleanupValue('#tracking_utm_term'),
+      utm_content: cleanupValue('#tracking_utm_content')
+    };
+
+    for (i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      if (wsTracking[key]) {
+        params[key] = wsTracking[key];
+      }
+    }
+
+    try {
+      var searchParams = new URLSearchParams(window.location.search || '');
+      for (i = 0; i < keys.length; i += 1) {
+        var queryKey = keys[i];
+        if (!params[queryKey]) {
+          var queryValue = norm(searchParams.get(queryKey) || '');
+          if (queryValue) {
+            params[queryKey] = queryValue;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore and keep what we already resolved.
+    }
+
+    var out = [];
+    for (i = 0; i < keys.length; i += 1) {
+      var outKey = keys[i];
+      var outValue = norm(params[outKey] || '');
+      if (!outValue) {
+        continue;
+      }
+      out.push(outKey + '=' + encodeURIComponent(outValue));
+    }
+
+    return out.join('&');
+  }
+
   function inferFormKey() {
     var manual = cleanupValue(manualFormKey);
     if (manual) {
@@ -268,7 +341,14 @@ https://wsform.com/knowledgebase/variables/#field
     for (var i = 0; i < keys.length; i += 1) {
       var key = keys[i];
       var value = key === 'UTM polja' ? cleanupUtm(lead[key]) : cleanupValue(lead[key]);
+      if (key === 'UTM polja' && !value) {
+        value = inferUtmFromLocation();
+      }
       finalLead[key] = value;
+    }
+
+    if (!finalLead['Proizvod/Usluga']) {
+      finalLead['Proizvod/Usluga'] = inferProductServiceFromPage();
     }
 
     var interestMode = norm(interestSourceMode).toLowerCase();
@@ -1136,7 +1216,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.3.5'
+                '0.3.6'
             );
         }
 
@@ -1144,7 +1224,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.3.5',
+            '0.3.6',
             true
         );
 

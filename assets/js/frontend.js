@@ -1066,15 +1066,41 @@
     return obj;
   }
 
-  function getDataLayerArray() {
+  function getDataLayerTargets() {
     var settings = config.dataLayer && typeof config.dataLayer === 'object' ? config.dataLayer : {};
     var objectName = asString(settings.objectName || 'dataLayer').trim() || 'dataLayer';
+    var names = [];
+    var seenNames = {};
+    var out = [];
 
-    if (!window[objectName] || !Array.isArray(window[objectName])) {
-      window[objectName] = [];
+    function addName(name) {
+      var safeName = asString(name).trim();
+      if (!safeName) {
+        return;
+      }
+      if (seenNames[safeName]) {
+        return;
+      }
+      seenNames[safeName] = true;
+      names.push(safeName);
     }
 
-    return window[objectName];
+    addName(objectName);
+    addName('dataLayer');
+    addName('datalayer');
+
+    for (var i = 0; i < names.length; i += 1) {
+      var name = names[i];
+      if (!window[name] || !Array.isArray(window[name])) {
+        window[name] = [];
+      }
+      out.push({
+        name: name,
+        ref: window[name]
+      });
+    }
+
+    return out;
   }
 
   function pushDataLayerEvent(type, payload, meta) {
@@ -1119,7 +1145,20 @@
       dlEvent.emerus_lead = leadObj;
     }
 
-    getDataLayerArray().push(dlEvent);
+    var targets = getDataLayerTargets();
+    var seenRefs = [];
+
+    for (var t = 0; t < targets.length; t += 1) {
+      var target = targets[t];
+      if (!target || !Array.isArray(target.ref)) {
+        continue;
+      }
+      if (seenRefs.indexOf(target.ref) !== -1) {
+        continue;
+      }
+      seenRefs.push(target.ref);
+      target.ref.push(dlEvent);
+    }
   }
 
   async function sendLead(payload) {
@@ -1131,6 +1170,9 @@
     }
 
     var finalPayload = injectGlobalContext(payload);
+    if (window.console && typeof window.console.log === 'function') {
+      window.console.log('Emerus final payload', finalPayload);
+    }
     var response;
     var data;
 
