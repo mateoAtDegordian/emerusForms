@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.6
+ * Version: 0.4.8
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -448,6 +448,14 @@ https://wsform.com/knowledgebase/variables/#field
         formLabel: cleanupValue('#form_label'),
         payload: previewPayload
       });
+      if (window.EmerusZoho && typeof window.EmerusZoho.previewBackendLead === 'function') {
+        try {
+          var backendPreview = await window.EmerusZoho.previewBackendLead(payload);
+          console.log('Emerus backend payload preview (dry run)', backendPreview);
+        } catch (previewError) {
+          console.error('Emerus backend payload preview failed:', previewError);
+        }
+      }
       return;
     }
 
@@ -1268,7 +1276,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.4.6'
+                '0.4.8'
             );
         }
 
@@ -1276,7 +1284,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.4.6',
+            '0.4.8',
             true
         );
 
@@ -1760,10 +1768,6 @@ JS;
     public function handle_zoho_lead(WP_REST_Request $request) {
         $options = $this->get_options();
 
-        if ((int) $options['zoho_enabled'] !== 1) {
-            return new WP_Error('emerus_zoho_disabled', 'Zoho lead sending is disabled in plugin settings.', ['status' => 403]);
-        }
-
         $nonce = $request->get_header('x_wp_nonce');
         if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
             return new WP_Error('emerus_bad_nonce', 'Invalid REST nonce.', ['status' => 403]);
@@ -1772,6 +1776,24 @@ JS;
         $payload = $request->get_json_params();
         if (!is_array($payload)) {
             $payload = $request->get_body_params();
+        }
+
+        $preview_raw = null;
+        if (isset($payload['preview_only'])) {
+            $preview_raw = $payload['preview_only'];
+        } elseif (isset($payload['dry_run_backend'])) {
+            $preview_raw = $payload['dry_run_backend'];
+        }
+
+        $preview_only = false;
+        if (is_bool($preview_raw)) {
+            $preview_only = $preview_raw;
+        } elseif ($preview_raw !== null) {
+            $preview_only = in_array(strtolower(trim((string) $preview_raw)), ['1', 'true', 'yes', 'on'], true);
+        }
+
+        if (!$preview_only && (int) $options['zoho_enabled'] !== 1) {
+            return new WP_Error('emerus_zoho_disabled', 'Zoho lead sending is disabled in plugin settings.', ['status' => 403]);
         }
 
         $lead = [];
@@ -1824,12 +1846,22 @@ JS;
             $lead['Last_Name'] = 'Website Lead';
         }
 
+        $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v8/' . rawurlencode((string) $options['zoho_module']);
+        $zoho_request = ['data' => [$lead]];
+
+        if ($preview_only) {
+            return new WP_REST_Response([
+                'success'     => true,
+                'previewOnly' => true,
+                'apiUrl'      => $api_url,
+                'request'     => $zoho_request,
+            ], 200);
+        }
+
         $token = $this->zoho_get_access_token($options);
         if (is_wp_error($token)) {
             return $token;
         }
-
-        $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode((string) $options['zoho_module']);
 
         $response = wp_remote_post($api_url, [
             'timeout' => (int) $options['zoho_timeout'],
@@ -1837,7 +1869,7 @@ JS;
                 'Authorization' => 'Zoho-oauthtoken ' . $token,
                 'Content-Type'  => 'application/json',
             ],
-            'body'    => wp_json_encode(['data' => [$lead]]),
+            'body'    => wp_json_encode($zoho_request),
         ]);
 
         if (is_wp_error($response)) {

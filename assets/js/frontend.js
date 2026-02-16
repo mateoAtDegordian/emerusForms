@@ -1187,6 +1187,76 @@
     return obj;
   }
 
+  function objectToRows(obj) {
+    var rows = [];
+    if (!obj || typeof obj !== 'object') {
+      return rows;
+    }
+
+    for (var key in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+        continue;
+      }
+      var value = asString(obj[key]);
+      if (value.trim() === '') {
+        continue;
+      }
+      rows.push({
+        k: asString(key),
+        v: value
+      });
+    }
+
+    return rows;
+  }
+
+  function normalizePayloadShape(payload) {
+    var out = payload && typeof payload === 'object' ? payload : {};
+    var hasRows = Array.isArray(out.rows);
+    var hasLead = out.lead && typeof out.lead === 'object' && !Array.isArray(out.lead);
+
+    if (!hasRows) {
+      out.rows = [];
+    }
+    if (!hasLead) {
+      out.lead = {};
+    }
+
+    var rowsObj = rowsToObject(out.rows);
+    var leadObj = out.lead;
+    var key;
+
+    // Fill missing lead values from rows.
+    for (key in rowsObj) {
+      if (!Object.prototype.hasOwnProperty.call(rowsObj, key)) {
+        continue;
+      }
+      if (isEmptyOrPlaceholderValue(leadObj[key])) {
+        leadObj[key] = rowsObj[key];
+      }
+    }
+
+    // Ensure rows include lead values as well.
+    for (key in leadObj) {
+      if (!Object.prototype.hasOwnProperty.call(leadObj, key)) {
+        continue;
+      }
+      var val = asString(leadObj[key]);
+      if (val.trim() === '') {
+        continue;
+      }
+      upsertRow(out.rows, key, val);
+    }
+
+    // If rows were empty but lead had values, regenerate rows from lead.
+    if (out.rows.length === 0) {
+      out.rows = objectToRows(leadObj);
+    }
+
+    out.lead = leadObj;
+    return out;
+  }
+
   function getDataLayerTargets() {
     var settings = config.dataLayer && typeof config.dataLayer === 'object' ? config.dataLayer : {};
     var objectName = asString(settings.objectName || 'dataLayer').trim() || 'dataLayer';
@@ -1295,7 +1365,9 @@
       }
     }
 
-    return injectGlobalContext(copy);
+    copy = normalizePayloadShape(copy);
+    copy = injectGlobalContext(copy);
+    return normalizePayloadShape(copy);
   }
 
   function previewLead(payload, options) {
@@ -1320,6 +1392,39 @@
     }
 
     return finalPayload;
+  }
+
+  async function previewBackendLead(payload) {
+    if (!config.restUrl) {
+      throw new Error('Zoho endpoint URL is missing.');
+    }
+
+    var finalPayload = prepareLeadPayload(payload);
+    finalPayload.preview_only = true;
+
+    var response = await fetch(config.restUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': config.nonce || ''
+      },
+      body: JSON.stringify(finalPayload || {})
+    });
+
+    var data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok) {
+      var message = (data && data.message) ? data.message : 'Backend preview failed.';
+      throw new Error(message);
+    }
+
+    return {
+      payload: finalPayload,
+      response: data
+    };
   }
 
   async function sendLead(payload) {
@@ -1467,6 +1572,7 @@
     nonce: config.nonce || '',
     sendLead: sendLead,
     previewLead: previewLead,
+    previewBackendLead: previewBackendLead,
     sendWsForm: sendWsForm,
     applyDefaults: function (formOrSelector, options) {
       return applyDefaults(formOrSelector, options || {});
