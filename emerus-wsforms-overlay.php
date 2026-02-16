@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.4
+ * Version: 0.4.5
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -89,6 +89,7 @@ https://wsform.com/knowledgebase/variables/#field
   var manualFormKey = ''; // optional override, e.g. services_products_en
   var dryRun = false; // true = log payload only
   var customInterestValue = ''; // optional hard override (if set, always used as fallback)
+  var customSubSource = ''; // optional override for non-plugin forms / custom grouping
   // Interest source mode per form:
   // auto = form value first, then URL mapping fallback
   // form = only form value (no URL fallback)
@@ -355,6 +356,11 @@ https://wsform.com/knowledgebase/variables/#field
       rows: rows,
       lead: finalLead
     };
+
+    var customSubSourceClean = cleanupValue(customSubSource);
+    if (customSubSourceClean) {
+      payload.sub_source = customSubSourceClean;
+    }
 
     if (dryRun) {
       var previewPayload = payload;
@@ -1113,7 +1119,7 @@ JS;
                         <th scope="row"><label for="zoho_sub_source_field_api">Sub-source API field</label></th>
                         <td>
                             <input type="text" id="zoho_sub_source_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_sub_source_field_api]" value="<?php echo esc_attr($options['zoho_sub_source_field_api']); ?>" class="regular-text code" />
-                            <p class="description">Leave empty if you do not use a sub-source custom field.</p>
+                            <p class="description">Leave empty if you do not use a sub-source custom field. JS payload can override defaults by sending <code>sub_source</code> (or <code>lead_sub_source</code>).</p>
                         </td>
                     </tr>
                     <tr>
@@ -1185,7 +1191,7 @@ JS;
                 'emerus-wsforms-overlay',
                 plugins_url('assets/css/frontend.css', __FILE__),
                 [],
-                '0.4.4'
+                '0.4.5'
             );
         }
 
@@ -1193,7 +1199,7 @@ JS;
             'emerus-wsforms-overlay',
             plugins_url('assets/js/frontend.js', __FILE__),
             [],
-            '0.4.4',
+            '0.4.5',
             true
         );
 
@@ -1712,8 +1718,19 @@ JS;
         }
 
         $sub_source_field = trim((string) $options['zoho_sub_source_field_api']);
-        if ($sub_source_field !== '' && empty($lead[$sub_source_field])) {
-            $lead[$sub_source_field] = $this->resolve_sub_source_value($payload, $variant, $options);
+        if ($sub_source_field !== '') {
+            $payload_sub_source = '';
+            if (isset($payload['sub_source'])) {
+                $payload_sub_source = sanitize_text_field((string) $payload['sub_source']);
+            } elseif (isset($payload['lead_sub_source'])) {
+                $payload_sub_source = sanitize_text_field((string) $payload['lead_sub_source']);
+            }
+
+            if ($payload_sub_source !== '') {
+                $lead[$sub_source_field] = $payload_sub_source;
+            } elseif (empty($lead[$sub_source_field])) {
+                $lead[$sub_source_field] = $this->resolve_sub_source_value($payload, $variant, $options);
+            }
         }
 
         $page_url = isset($payload['page_url']) ? esc_url_raw($payload['page_url']) : '';
