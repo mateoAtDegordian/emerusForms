@@ -1477,12 +1477,27 @@
     }
 
     if (!response.ok) {
+      var detailMessage = '';
+      if (data && data.data && data.data.response) {
+        if (typeof data.data.response.message === 'string' && data.data.response.message) {
+          detailMessage = data.data.response.message;
+        } else if (typeof data.data.response.code === 'string' && data.data.response.code) {
+          detailMessage = data.data.response.code;
+        }
+      }
+
       var message = (data && data.message) ? data.message : 'Zoho request failed.';
+      if (detailMessage) {
+        message += ' (' + detailMessage + ')';
+      }
+
       pushDataLayerEvent('error', finalPayload, {
         httpStatus: response.status,
         errorMessage: message
       });
-      throw new Error(message);
+      var requestError = new Error(message);
+      requestError.response = data;
+      throw requestError;
     }
 
     var zohoId = '';
