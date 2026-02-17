@@ -96,7 +96,7 @@
   }
 
   .emerus-wsforms-overlay-root.is-below-hero {
-    margin: calc(var(--ewo-mobile-overlap) * -1) auto 0;
+    margin: calc(var(--ewo-mobile-overlap) * -2) auto 0;
   }
 
   .emerus-wsforms-overlay {
