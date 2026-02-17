@@ -52,6 +52,8 @@ final class Emerus_WSForms_Overlay {
         $options = $this->sanitize_options($raw);
 
         update_option(self::OPTION_KEY, $options);
+        delete_transient('emerus_zoho_access_token');
+        delete_transient($this->zoho_token_cache_key($options));
         add_settings_error('emerus_wsforms_overlay_messages', 'emerus_wsforms_overlay_saved', __('Settings saved.', 'emerus-wsforms-overlay'), 'updated');
     }
 
@@ -1864,22 +1866,27 @@ JS;
             return $token;
         }
 
-        $response = wp_remote_post($api_url, [
-            'timeout' => (int) $options['zoho_timeout'],
-            'headers' => [
-                'Authorization' => 'Zoho-oauthtoken ' . $token,
-                'Content-Type'  => 'application/json',
-            ],
-            'body'    => wp_json_encode($zoho_request),
-        ]);
-
-        if (is_wp_error($response)) {
-            return new WP_Error('emerus_zoho_request_error', $response->get_error_message(), ['status' => 500]);
+        $request_result = $this->zoho_send_request($api_url, $token, (int) $options['zoho_timeout'], $zoho_request);
+        if (is_wp_error($request_result)) {
+            return new WP_Error('emerus_zoho_request_error', $request_result->get_error_message(), ['status' => 500]);
         }
 
-        $http_code = (int) wp_remote_retrieve_response_code($response);
-        $raw_body  = (string) wp_remote_retrieve_body($response);
-        $json_body = json_decode($raw_body, true);
+        $http_code = (int) $request_result['httpCode'];
+        $raw_body  = (string) $request_result['rawBody'];
+        $json_body = $request_result['jsonBody'];
+
+        if ($http_code >= 400 && $http_code < 500) {
+            // Retry once with forced token refresh to avoid stale cached token edge-cases.
+            $fresh_token = $this->zoho_get_access_token($options, true);
+            if (!is_wp_error($fresh_token)) {
+                $retry_result = $this->zoho_send_request($api_url, $fresh_token, (int) $options['zoho_timeout'], $zoho_request);
+                if (!is_wp_error($retry_result)) {
+                    $http_code = (int) $retry_result['httpCode'];
+                    $raw_body  = (string) $retry_result['rawBody'];
+                    $json_body = $retry_result['jsonBody'];
+                }
+            }
+        }
 
         if ($http_code < 200 || $http_code >= 300) {
             return new WP_Error('emerus_zoho_error', 'Zoho request failed.', [
@@ -1896,9 +1903,29 @@ JS;
         ], 200);
     }
 
-    private function zoho_get_access_token(array $options) {
-        $cache_key = 'emerus_zoho_access_token';
-        $token     = get_transient($cache_key);
+    private function zoho_token_cache_key(array $options) {
+        $signature = implode('|', [
+            trim((string) $options['zoho_accounts_base']),
+            trim((string) $options['zoho_client_id']),
+            trim((string) $options['zoho_refresh_token']),
+        ]);
+
+        if ($signature === '||') {
+            return 'emerus_zoho_access_token';
+        }
+
+        return 'emerus_zoho_access_token_' . substr(md5($signature), 0, 16);
+    }
+
+    private function zoho_get_access_token(array $options, $force_refresh = false) {
+        $cache_key = $this->zoho_token_cache_key($options);
+
+        if ($force_refresh) {
+            delete_transient($cache_key);
+            delete_transient('emerus_zoho_access_token');
+        }
+
+        $token = get_transient($cache_key);
 
         if (is_string($token) && $token !== '') {
             return $token;
@@ -1939,6 +1966,30 @@ JS;
         set_transient($cache_key, (string) $json_body['access_token'], $expires_in);
 
         return (string) $json_body['access_token'];
+    }
+
+    private function zoho_send_request($api_url, $token, $timeout, array $zoho_request) {
+        $response = wp_remote_post((string) $api_url, [
+            'timeout' => (int) $timeout,
+            'headers' => [
+                'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode($zoho_request),
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $raw_body  = (string) wp_remote_retrieve_body($response);
+        $json_body = json_decode($raw_body, true);
+
+        return [
+            'httpCode' => (int) wp_remote_retrieve_response_code($response),
+            'rawBody'  => $raw_body,
+            'jsonBody' => $json_body,
+        ];
     }
 
     private function build_lead_from_rows(array $rows) {
