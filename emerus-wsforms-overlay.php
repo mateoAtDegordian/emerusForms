@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.11
+ * Version: 0.4.12
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -563,6 +563,7 @@ JS;
             'zoho_sub_source_hero'       => 'Hero forma',
             'zoho_sub_source_product'    => 'Ponuda - proizvod',
             'zoho_sub_source_map'        => [],
+            'zoho_field_map'             => [],
             'zoho_source_field_api'      => 'Lead_Source',
             'zoho_sub_source_field_api'  => '',
             'zoho_page_url_field_api'    => '',
@@ -634,6 +635,7 @@ JS;
             'zoho_sub_source_hero'       => isset($raw['zoho_sub_source_hero']) ? sanitize_text_field($raw['zoho_sub_source_hero']) : $defaults['zoho_sub_source_hero'],
             'zoho_sub_source_product'    => isset($raw['zoho_sub_source_product']) ? sanitize_text_field($raw['zoho_sub_source_product']) : $defaults['zoho_sub_source_product'],
             'zoho_sub_source_map'        => $this->sanitize_key_value_rows(isset($raw['zoho_sub_source_map']) ? (array) $raw['zoho_sub_source_map'] : []),
+            'zoho_field_map'             => $this->sanitize_key_value_rows(isset($raw['zoho_field_map']) ? (array) $raw['zoho_field_map'] : []),
             'zoho_source_field_api'      => isset($raw['zoho_source_field_api']) ? sanitize_text_field($raw['zoho_source_field_api']) : $defaults['zoho_source_field_api'],
             'zoho_sub_source_field_api'  => isset($raw['zoho_sub_source_field_api']) ? sanitize_text_field($raw['zoho_sub_source_field_api']) : $defaults['zoho_sub_source_field_api'],
             'zoho_page_url_field_api'    => isset($raw['zoho_page_url_field_api']) ? sanitize_text_field($raw['zoho_page_url_field_api']) : $defaults['zoho_page_url_field_api'],
@@ -796,6 +798,165 @@ JS;
         <?php
     }
 
+    private function map_lead_field_names(array $lead, array $map_rows) {
+        if (empty($map_rows)) {
+            return $lead;
+        }
+
+        $exact_map = [];
+        $lower_map = [];
+        foreach ($map_rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $from = isset($row['match']) ? trim((string) $row['match']) : '';
+            $to   = isset($row['value']) ? trim((string) $row['value']) : '';
+            if ($from === '' || $to === '') {
+                continue;
+            }
+
+            $exact_map[$from] = $to;
+            $lower_map[strtolower($from)] = $to;
+        }
+
+        if (empty($exact_map)) {
+            return $lead;
+        }
+
+        $mapped = [];
+        foreach ($lead as $key => $value) {
+            $from_key = trim((string) $key);
+            if ($from_key === '') {
+                continue;
+            }
+
+            $target_key = $from_key;
+            if (isset($exact_map[$from_key])) {
+                $target_key = $exact_map[$from_key];
+            } else {
+                $lower = strtolower($from_key);
+                if (isset($lower_map[$lower])) {
+                    $target_key = $lower_map[$lower];
+                }
+            }
+
+            if ($target_key === '') {
+                $target_key = $from_key;
+            }
+
+            $str_value = is_scalar($value) ? (string) $value : wp_json_encode($value);
+            if (!array_key_exists($target_key, $mapped)) {
+                $mapped[$target_key] = $str_value;
+                continue;
+            }
+
+            if (trim((string) $mapped[$target_key]) === '' && trim($str_value) !== '') {
+                $mapped[$target_key] = $str_value;
+            }
+        }
+
+        return $mapped;
+    }
+
+    private function zoho_fields_cache_key(array $options) {
+        $signature = implode('|', [
+            trim((string) $options['zoho_api_base']),
+            trim((string) $options['zoho_module']),
+            trim((string) $options['zoho_client_id']),
+            trim((string) $options['zoho_refresh_token']),
+        ]);
+        return 'emerus_zoho_fields_' . substr(md5($signature), 0, 16);
+    }
+
+    private function get_zoho_fields_for_admin(array $options, $force_refresh = false) {
+        $cache_key = $this->zoho_fields_cache_key($options);
+        if (!$force_refresh) {
+            $cached = get_transient($cache_key);
+            if (is_array($cached)) {
+                return [
+                    'success' => true,
+                    'source'  => 'cache',
+                    'fields'  => $cached,
+                ];
+            }
+        }
+
+        $token = $this->zoho_get_access_token($options, (bool) $force_refresh);
+        if (is_wp_error($token)) {
+            return [
+                'success' => false,
+                'message' => $token->get_error_message(),
+                'details' => $token->get_error_data(),
+            ];
+        }
+
+        $api_url = trailingslashit((string) $options['zoho_api_base'])
+            . 'crm/v2/settings/fields?module='
+            . rawurlencode((string) $options['zoho_module']);
+
+        $request = $this->zoho_send_get_request($api_url, $token, (int) $options['zoho_timeout']);
+        if (is_wp_error($request)) {
+            return [
+                'success' => false,
+                'message' => $request->get_error_message(),
+                'details' => $request->get_error_data(),
+            ];
+        }
+
+        if ((int) $request['httpCode'] >= 400 && (int) $request['httpCode'] < 500) {
+            $fresh_token = $this->zoho_get_access_token($options, true);
+            if (!is_wp_error($fresh_token)) {
+                $retry = $this->zoho_send_get_request($api_url, $fresh_token, (int) $options['zoho_timeout']);
+                if (!is_wp_error($retry)) {
+                    $request = $retry;
+                }
+            }
+        }
+
+        $http_code = (int) $request['httpCode'];
+        $raw_body  = (string) $request['rawBody'];
+        $json_body = is_array($request['jsonBody']) ? $request['jsonBody'] : [];
+
+        if ($http_code < 200 || $http_code >= 300) {
+            return [
+                'success' => false,
+                'message' => 'Zoho fields request failed.',
+                'details' => $json_body ?: $raw_body,
+            ];
+        }
+
+        $fields_raw = isset($json_body['fields']) && is_array($json_body['fields']) ? $json_body['fields'] : [];
+        $fields = [];
+
+        foreach ($fields_raw as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $api_name = isset($field['api_name']) ? trim((string) $field['api_name']) : '';
+            if ($api_name === '') {
+                continue;
+            }
+
+            $fields[] = [
+                'api_name'         => $api_name,
+                'label'            => isset($field['field_label']) ? (string) $field['field_label'] : '',
+                'data_type'        => isset($field['data_type']) ? (string) $field['data_type'] : '',
+                'system_mandatory' => !empty($field['system_mandatory']),
+                'read_only'        => !empty($field['read_only']),
+            ];
+        }
+
+        set_transient($cache_key, $fields, 15 * MINUTE_IN_SECONDS);
+
+        return [
+            'success' => true,
+            'source'  => 'live',
+            'fields'  => $fields,
+        ];
+    }
+
     public function render_admin_page() {
         if (!current_user_can('manage_options')) {
             return;
@@ -806,6 +967,40 @@ JS;
             'sort_column' => 'menu_order,post_title',
             'post_status' => ['publish', 'private'],
         ]);
+        $fetch_zoho_fields = isset($_GET['emerus_zoho_fetch_fields']) && $_GET['emerus_zoho_fetch_fields'] === '1';
+        $force_refresh_fields = $fetch_zoho_fields
+            && isset($_GET['emerus_zoho_refresh_fields'])
+            && $_GET['emerus_zoho_refresh_fields'] === '1';
+        $can_fetch_zoho_fields = $fetch_zoho_fields
+            && isset($_GET['_wpnonce'])
+            && wp_verify_nonce((string) $_GET['_wpnonce'], 'emerus_zoho_fetch_fields');
+        $zoho_fields_result = null;
+
+        if ($can_fetch_zoho_fields) {
+            $zoho_fields_result = $this->get_zoho_fields_for_admin($options, $force_refresh_fields);
+        } else {
+            $cached = get_transient($this->zoho_fields_cache_key($options));
+            if (is_array($cached)) {
+                $zoho_fields_result = [
+                    'success' => true,
+                    'source'  => 'cache',
+                    'fields'  => $cached,
+                ];
+            }
+        }
+
+        $fetch_query_args = [
+            'page' => 'emerus-wsforms-overlay',
+            'emerus_zoho_fetch_fields' => '1',
+            'emerus_zoho_refresh_fields' => '1',
+        ];
+        if (isset($_GET['lang'])) {
+            $lang_param = sanitize_text_field((string) wp_unslash($_GET['lang']));
+            if ($lang_param !== '') {
+                $fetch_query_args['lang'] = $lang_param;
+            }
+        }
+        $fetch_zoho_fields_url = wp_nonce_url(add_query_arg($fetch_query_args, admin_url('options-general.php')), 'emerus_zoho_fetch_fields');
 
         settings_errors('emerus_wsforms_overlay_messages');
         ?>
@@ -1188,6 +1383,13 @@ JS;
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">Payload -> Zoho field mapping</th>
+                        <td>
+                            <p class="description">Map your internal payload keys to real Zoho API field names. Example: <code>Landing Page</code> -> <code>Landing_page</code>.</p>
+                            <?php $this->render_key_value_rows_table('zoho_field_map', isset($options['zoho_field_map']) ? (array) $options['zoho_field_map'] : [], ['Payload key', 'Zoho API field']); ?>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="zoho_source_field_api">Lead Source API field</label></th>
                         <td>
                             <input type="text" id="zoho_source_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_source_field_api]" value="<?php echo esc_attr($options['zoho_source_field_api']); ?>" class="regular-text code" />
@@ -1208,6 +1410,50 @@ JS;
                     <tr>
                         <th scope="row"><label for="zoho_page_title_field_api">Page title API field</label></th>
                         <td><input type="text" id="zoho_page_title_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_page_title_field_api]" value="<?php echo esc_attr($options['zoho_page_title_field_api']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Available Zoho fields (module)</th>
+                        <td>
+                            <p>
+                                <a href="<?php echo esc_url($fetch_zoho_fields_url); ?>" class="button button-secondary">Refresh fields from Zoho</a>
+                                <span class="description">Fetches <code><?php echo esc_html((string) $options['zoho_module']); ?></code> fields from Zoho API and shows API names for mapping.</span>
+                            </p>
+                            <?php if (is_array($zoho_fields_result) && !empty($zoho_fields_result['success']) && !empty($zoho_fields_result['fields']) && is_array($zoho_fields_result['fields'])) : ?>
+                                <p class="description">Source: <code><?php echo esc_html((string) $zoho_fields_result['source']); ?></code></p>
+                                <div style="max-height: 320px; overflow: auto; border: 1px solid #dcdcde;">
+                                    <table class="widefat striped" style="margin:0;">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 28%;">API name</th>
+                                                <th style="width: 28%;">Label</th>
+                                                <th style="width: 18%;">Data type</th>
+                                                <th style="width: 12%;">Required</th>
+                                                <th style="width: 14%;">Read-only</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ((array) $zoho_fields_result['fields'] as $field) : ?>
+                                                <?php if (!is_array($field)) { continue; } ?>
+                                                <tr>
+                                                    <td><code><?php echo esc_html(isset($field['api_name']) ? (string) $field['api_name'] : ''); ?></code></td>
+                                                    <td><?php echo esc_html(isset($field['label']) ? (string) $field['label'] : ''); ?></td>
+                                                    <td><code><?php echo esc_html(isset($field['data_type']) ? (string) $field['data_type'] : ''); ?></code></td>
+                                                    <td><?php echo !empty($field['system_mandatory']) ? 'yes' : 'no'; ?></td>
+                                                    <td><?php echo !empty($field['read_only']) ? 'yes' : 'no'; ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php elseif (is_array($zoho_fields_result) && empty($zoho_fields_result['success'])) : ?>
+                                <p style="color:#b32d2e;"><strong>Could not fetch Zoho fields:</strong> <?php echo esc_html(isset($zoho_fields_result['message']) ? (string) $zoho_fields_result['message'] : 'Unknown error'); ?></p>
+                                <?php if (!empty($zoho_fields_result['details'])) : ?>
+                                    <textarea readonly rows="6" class="large-text code"><?php echo esc_textarea(wp_json_encode($zoho_fields_result['details'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); ?></textarea>
+                                <?php endif; ?>
+                            <?php else : ?>
+                                <p class="description">No fields fetched yet. Click <strong>Refresh fields from Zoho</strong>.</p>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 </table>
 
@@ -1803,6 +2049,11 @@ JS;
             $lead = $this->build_lead_from_rows(isset($payload['rows']) ? (array) $payload['rows'] : []);
         }
 
+        $field_map_rows = isset($options['zoho_field_map']) && is_array($options['zoho_field_map'])
+            ? $options['zoho_field_map']
+            : [];
+        $lead = $this->map_lead_field_names($lead, $field_map_rows);
+
         $variant = isset($payload['form_variant']) ? sanitize_key($payload['form_variant']) : 'hero';
 
         $source_field = trim((string) $options['zoho_source_field_api']);
@@ -1857,6 +2108,7 @@ JS;
                     'subSourceFieldApi' => $sub_source_field,
                     'payloadSubSource'  => $payload_sub_source,
                     'resolvedSubSource' => $resolved_sub_source,
+                    'fieldMapCount'     => count($field_map_rows),
                 ],
             ], 200);
         }
@@ -1976,6 +2228,29 @@ JS;
                 'Content-Type'  => 'application/json',
             ],
             'body'    => wp_json_encode($zoho_request),
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $raw_body  = (string) wp_remote_retrieve_body($response);
+        $json_body = json_decode($raw_body, true);
+
+        return [
+            'httpCode' => (int) wp_remote_retrieve_response_code($response),
+            'rawBody'  => $raw_body,
+            'jsonBody' => $json_body,
+        ];
+    }
+
+    private function zoho_send_get_request($api_url, $token, $timeout) {
+        $response = wp_remote_get((string) $api_url, [
+            'timeout' => (int) $timeout,
+            'headers' => [
+                'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                'Content-Type'  => 'application/json',
+            ],
         ]);
 
         if (is_wp_error($response)) {
