@@ -563,7 +563,7 @@ JS;
             'zoho_sub_source_hero'       => 'Hero forma',
             'zoho_sub_source_product'    => 'Ponuda - proizvod',
             'zoho_sub_source_map'        => [],
-            'zoho_field_map'             => [],
+            'zoho_field_map'             => $this->recommended_zoho_field_map(),
             'zoho_source_field_api'      => 'Lead_Source',
             'zoho_sub_source_field_api'  => '',
             'zoho_page_url_field_api'    => '',
@@ -572,7 +572,31 @@ JS;
     }
 
     private function get_options() {
-        return wp_parse_args((array) get_option(self::OPTION_KEY, []), $this->defaults());
+        $options = wp_parse_args((array) get_option(self::OPTION_KEY, []), $this->defaults());
+
+        if (empty($options['zoho_field_map']) || !is_array($options['zoho_field_map'])) {
+            $options['zoho_field_map'] = $this->recommended_zoho_field_map();
+        }
+
+        return $options;
+    }
+
+    private function recommended_zoho_field_map() {
+        return [
+            ['match' => 'Last_Name', 'value' => 'Last_Name'],
+            ['match' => 'First_Name', 'value' => 'First_Name'],
+            ['match' => 'Email', 'value' => 'Email'],
+            ['match' => 'Phone', 'value' => 'Phone'],
+            ['match' => 'Description', 'value' => 'Description'],
+            ['match' => 'Interes', 'value' => 'Interes'],
+            ['match' => 'Proizvod/Usluga', 'value' => 'Proizvod_Usluga'],
+            ['match' => 'Landing Page', 'value' => 'Landing_page'],
+            ['match' => 'Page URL', 'value' => 'Page_URL'],
+            ['match' => 'Page Title', 'value' => 'Page_Title'],
+            ['match' => 'UTM polja', 'value' => 'UTM_polja'],
+            ['match' => 'Web Form', 'value' => 'Web_form'],
+            ['match' => 'Zanimacija za', 'value' => 'Zanimacija_za'],
+        ];
     }
 
     private function sanitize_options(array $raw) {
@@ -838,6 +862,8 @@ JS;
                 $lower = strtolower($from_key);
                 if (isset($lower_map[$lower])) {
                     $target_key = $lower_map[$lower];
+                } else {
+                    $target_key = $this->normalize_field_key_for_zoho($from_key);
                 }
             }
 
@@ -857,6 +883,19 @@ JS;
         }
 
         return $mapped;
+    }
+
+    private function normalize_field_key_for_zoho($key) {
+        $normalized = trim((string) $key);
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = preg_replace('/[\s\/-]+/u', '_', $normalized);
+        $normalized = preg_replace('/_+/', '_', (string) $normalized);
+        $normalized = trim((string) $normalized, '_');
+
+        return $normalized !== '' ? $normalized : trim((string) $key);
     }
 
     private function zoho_fields_cache_key(array $options) {
