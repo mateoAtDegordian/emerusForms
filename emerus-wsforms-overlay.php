@@ -1985,6 +1985,31 @@ JS;
         return $variant === 'product' ? (string) $options['zoho_sub_source_product'] : (string) $options['zoho_sub_source_hero'];
     }
 
+    private function resolve_zoho_module(array $payload, array $options) {
+        $default_module = trim((string) $options['zoho_module']);
+        if ($default_module === '') {
+            $default_module = 'Leads';
+        }
+
+        $form_key_raw = isset($payload['form_key']) ? sanitize_text_field((string) $payload['form_key']) : '';
+        $form_key     = strtolower(trim($form_key_raw));
+
+        $form_id_raw = '';
+        if (isset($payload['form_id'])) {
+            $form_id_raw = (string) $payload['form_id'];
+        } elseif (isset($payload['formId'])) {
+            $form_id_raw = (string) $payload['formId'];
+        }
+        $form_id = absint($form_id_raw);
+
+        // Newsletter: WS Form ID 2 should go to Contacts.
+        if ($form_key === 'ws_form_2' || $form_id === 2) {
+            return 'Contacts';
+        }
+
+        return $default_module;
+    }
+
     private function sub_source_rule_matches($match, $form_key, $variant) {
         $tokens = array_filter(array_map('trim', explode(',', (string) $match)));
         if (empty($tokens)) {
@@ -2133,7 +2158,8 @@ JS;
             $lead['Last_Name'] = 'Website Lead';
         }
 
-        $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode((string) $options['zoho_module']);
+        $resolved_module = $this->resolve_zoho_module($payload, $options);
+        $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode($resolved_module);
         $zoho_request = ['data' => [$lead]];
 
         if ($preview_only) {
@@ -2148,6 +2174,7 @@ JS;
                     'payloadSubSource'  => $payload_sub_source,
                     'resolvedSubSource' => $resolved_sub_source,
                     'fieldMapCount'     => count($field_map_rows),
+                    'resolvedModule'    => $resolved_module,
                 ],
             ], 200);
         }
