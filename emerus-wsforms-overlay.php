@@ -2010,6 +2010,45 @@ JS;
         return $default_module;
     }
 
+    private function resolve_zoho_tags(array $payload) {
+        $tags = [];
+
+        if (isset($payload['tags'])) {
+            $raw_tags = $payload['tags'];
+            if (is_array($raw_tags)) {
+                foreach ($raw_tags as $tag) {
+                    $name = sanitize_text_field((string) $tag);
+                    if ($name !== '') {
+                        $tags[] = $name;
+                    }
+                }
+            } else {
+                $text = sanitize_text_field((string) $raw_tags);
+                if ($text !== '') {
+                    $parts = array_filter(array_map('trim', explode(',', $text)));
+                    foreach ($parts as $part) {
+                        $name = sanitize_text_field((string) $part);
+                        if ($name !== '') {
+                            $tags[] = $name;
+                        }
+                    }
+                }
+            }
+        }
+
+        $form_key_raw = isset($payload['form_key']) ? sanitize_text_field((string) $payload['form_key']) : '';
+        $form_key     = strtolower(trim($form_key_raw));
+        $form_id_raw  = isset($payload['form_id']) ? (string) $payload['form_id'] : (isset($payload['formId']) ? (string) $payload['formId'] : '');
+        $form_id      = absint($form_id_raw);
+
+        // Newsletter default tag for WS Form ID 2 unless tags are explicitly provided.
+        if (empty($tags) && ($form_key === 'ws_form_2' || $form_id === 2)) {
+            $tags[] = 'Newsletter';
+        }
+
+        return array_values(array_unique($tags));
+    }
+
     private function sub_source_rule_matches($match, $form_key, $variant) {
         $tokens = array_filter(array_map('trim', explode(',', (string) $match)));
         if (empty($tokens)) {
@@ -2159,6 +2198,7 @@ JS;
         }
 
         $resolved_module = $this->resolve_zoho_module($payload, $options);
+        $resolved_tags = $this->resolve_zoho_tags($payload);
         $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode($resolved_module);
         $zoho_request = ['data' => [$lead]];
 
@@ -2175,6 +2215,7 @@ JS;
                     'resolvedSubSource' => $resolved_sub_source,
                     'fieldMapCount'     => count($field_map_rows),
                     'resolvedModule'    => $resolved_module,
+                    'resolvedTags'      => $resolved_tags,
                 ],
             ], 200);
         }
@@ -2199,6 +2240,7 @@ JS;
             if (!is_wp_error($fresh_token)) {
                 $retry_result = $this->zoho_send_request($api_url, $fresh_token, (int) $options['zoho_timeout'], $zoho_request);
                 if (!is_wp_error($retry_result)) {
+                    $token = $fresh_token;
                     $http_code = (int) $retry_result['httpCode'];
                     $raw_body  = (string) $retry_result['rawBody'];
                     $json_body = $retry_result['jsonBody'];
@@ -2214,10 +2256,39 @@ JS;
             ]);
         }
 
+        $tag_result = null;
+        if (!empty($resolved_tags)) {
+            $created_id = '';
+            if (is_array($json_body)
+                && !empty($json_body['data'][0]['details']['id'])
+            ) {
+                $created_id = (string) $json_body['data'][0]['details']['id'];
+            }
+
+            if ($created_id !== '') {
+                $tag_result = $this->zoho_add_tags_to_record(
+                    (string) $options['zoho_api_base'],
+                    $resolved_module,
+                    $created_id,
+                    (string) $token,
+                    (int) $options['zoho_timeout'],
+                    $resolved_tags
+                );
+            } else {
+                $tag_result = new WP_Error('emerus_zoho_tag_missing_record', 'Could not resolve record ID for tag assignment.');
+            }
+        }
+
         return new WP_REST_Response([
             'success'  => true,
             'httpCode' => $http_code,
             'response' => $json_body,
+            'tags'     => [
+                'requested' => $resolved_tags,
+                'result'    => is_wp_error($tag_result)
+                    ? ['success' => false, 'error' => $tag_result->get_error_message(), 'data' => $tag_result->get_error_data()]
+                    : (is_array($tag_result) ? $tag_result : null),
+            ],
         ], 200);
     }
 
@@ -2330,6 +2401,51 @@ JS;
             'httpCode' => (int) wp_remote_retrieve_response_code($response),
             'rawBody'  => $raw_body,
             'jsonBody' => $json_body,
+        ];
+    }
+
+    private function zoho_add_tags_to_record($api_base, $module, $record_id, $token, $timeout, array $tags) {
+        if (empty($tags)) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $api_url = trailingslashit((string) $api_base) . 'crm/v8/' . rawurlencode((string) $module) . '/' . rawurlencode((string) $record_id) . '/actions/add_tags';
+        $body = [
+            'tags' => array_map(static function ($name) {
+                return ['name' => (string) $name];
+            }, array_values($tags)),
+            'over_write' => false,
+        ];
+
+        $response = wp_remote_post((string) $api_url, [
+            'timeout' => (int) $timeout,
+            'headers' => [
+                'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode($body),
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_Error('emerus_zoho_tag_request_error', $response->get_error_message(), ['status' => 500]);
+        }
+
+        $http_code = (int) wp_remote_retrieve_response_code($response);
+        $raw_body  = (string) wp_remote_retrieve_body($response);
+        $json_body = json_decode($raw_body, true);
+
+        if ($http_code < 200 || $http_code >= 300) {
+            return new WP_Error('emerus_zoho_tag_error', 'Zoho add-tags request failed.', [
+                'status'   => 502,
+                'httpCode' => $http_code,
+                'response' => $json_body ?: $raw_body,
+            ]);
+        }
+
+        return [
+            'success'  => true,
+            'httpCode' => $http_code,
+            'response' => $json_body,
         ];
     }
 
