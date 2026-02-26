@@ -2541,10 +2541,8 @@ JS;
         }
 
         // Zoho Campaigns listsubscribe expects "Contact Email" as mandatory key.
-        // Keep aliases for compatibility with account-side field variations.
         $contact_info = [
             'Contact Email' => $email,
-            'Email'         => $email,
             'First Name'    => $first_name,
             'Last Name'     => $last_name,
         ];
@@ -2560,7 +2558,10 @@ JS;
             return ['success' => true, 'skipped' => true];
         }
 
-        $email = isset($contact_info['Email']) ? sanitize_email((string) $contact_info['Email']) : '';
+        $email = isset($contact_info['Contact Email']) ? sanitize_email((string) $contact_info['Contact Email']) : '';
+        if ($email === '' && isset($contact_info['Email'])) {
+            $email = sanitize_email((string) $contact_info['Email']);
+        }
         if ($email === '') {
             return new WP_Error('emerus_zoho_campaigns_missing_email', 'Campaign list subscribe requires Email in lead payload.', ['status' => 400]);
         }
@@ -2613,7 +2614,7 @@ JS;
 
             if (!$ok) {
                 $error_code = is_array($json_body) && isset($json_body['code']) ? (string) $json_body['code'] : '';
-                if ($error_code === '903') {
+                if (in_array($error_code, ['903', '2007'], true)) {
                     // Fallback endpoint: add subscriber by email only.
                     $fallback_url = trailingslashit((string) $campaigns_base) . 'api/v1.1/addlistsubscribersinbulk';
                     $fallback_response = wp_remote_post((string) $fallback_url, [
@@ -2663,19 +2664,21 @@ JS;
     }
 
     private function build_campaigns_contactinfo_string(array $contact_info) {
-        $pairs = [];
+        $clean = [];
         foreach ($contact_info as $key => $value) {
             $k = trim(sanitize_text_field((string) $key));
             $v = trim(sanitize_text_field((string) $value));
             if ($k === '' || $v === '') {
                 continue;
             }
-            $v = str_replace([',', '{', '}', ':'], ' ', $v);
-            $v = preg_replace('/\s+/', ' ', $v);
-            $pairs[] = $k . ':' . trim((string) $v);
+            $clean[$k] = $v;
         }
 
-        return '{' . implode(',', $pairs) . '}';
+        if (empty($clean)) {
+            return '{}';
+        }
+
+        return (string) wp_json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function sub_source_rule_matches($match, $form_key, $variant) {
