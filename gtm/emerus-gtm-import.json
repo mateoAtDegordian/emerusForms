@@ -1,0 +1,871 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2026-02-24 00:00:00",
+  "containerVersion": {
+    "name": "Emerus Multi-Platform Tracking Pack",
+    "container": {
+      "name": "Emerus Tracking Container",
+      "publicId": "GTM-XXXXXXX",
+      "usageContext": [
+        "WEB"
+      ]
+    },
+    "variable": [
+      {
+        "name": "C - GA4 Measurement ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "G-XXXXXXXXXX"
+          }
+        ]
+      },
+      {
+        "name": "C - Google Ads Conversion ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "AW-XXXXXXXXXX"
+          }
+        ]
+      },
+      {
+        "name": "C - Google Ads Label - Lead",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "REPLACE_LEAD_LABEL"
+          }
+        ]
+      },
+      {
+        "name": "C - Google Ads Label - Phone Click",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "REPLACE_PHONE_LABEL"
+          }
+        ]
+      },
+      {
+        "name": "C - Google Ads Label - Email Click",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "REPLACE_EMAIL_LABEL"
+          }
+        ]
+      },
+      {
+        "name": "C - Meta Pixel ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "000000000000000"
+          }
+        ]
+      },
+      {
+        "name": "C - LinkedIn Partner ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "0000000"
+          }
+        ]
+      },
+      {
+        "name": "C - LinkedIn Conversion ID - Lead",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "0000000"
+          }
+        ]
+      },
+      {
+        "name": "C - LinkedIn Conversion ID - Phone Click",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "0000000"
+          }
+        ]
+      },
+      {
+        "name": "C - LinkedIn Conversion ID - Email Click",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "0000000"
+          }
+        ]
+      },
+      {
+        "name": "C - LinkedIn Conversion ID - Social Click",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": "0000000"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Status",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_status"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Form Variant",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_form_variant"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Form Key",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_form_key"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Page URL",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_page_url"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Page Title",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_page_title"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus HTTP Status",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_http_status"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Error Message",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_error_message"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Zoho ID",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_zoho_id"
+          }
+        ]
+      },
+      {
+        "name": "DLV - Emerus Rows Count",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "emerus_rows_count"
+          }
+        ]
+      },
+      {
+        "name": "JS - Social Network",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "function() { var raw = {{Click URL}} || ''; try { var host = (new URL(raw, document.location.origin)).hostname.toLowerCase(); if (host.indexOf('facebook.') !== -1) return 'facebook'; if (host.indexOf('instagram.') !== -1) return 'instagram'; if (host.indexOf('linkedin.') !== -1) return 'linkedin'; if (host.indexOf('youtube.') !== -1 || host.indexOf('youtu.be') !== -1) return 'youtube'; if (host.indexOf('x.com') !== -1 || host.indexOf('twitter.') !== -1) return 'x'; if (host.indexOf('tiktok.') !== -1) return 'tiktok'; if (host.indexOf('pinterest.') !== -1) return 'pinterest'; return host; } catch(e) { return ''; } }"
+          }
+        ]
+      }
+    ],
+    "trigger": [
+      {
+        "triggerId": "1",
+        "name": "TR - All Pages",
+        "type": "PAGEVIEW"
+      },
+      {
+        "triggerId": "2",
+        "name": "TR - Emerus Submit Success",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "emerus_zoho_submit_success"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "triggerId": "3",
+        "name": "TR - Emerus Submit Error",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "emerus_zoho_submit_error"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "triggerId": "4",
+        "name": "TR - Click tel",
+        "type": "LINK_CLICK",
+        "filter": [
+          {
+            "type": "STARTS_WITH",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{Click URL}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "tel:"
+              }
+            ]
+          }
+        ],
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "waitForTags",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "waitForTagsTimeout",
+            "value": "2000"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "checkValidation",
+            "value": "false"
+          }
+        ]
+      },
+      {
+        "triggerId": "5",
+        "name": "TR - Click mailto",
+        "type": "LINK_CLICK",
+        "filter": [
+          {
+            "type": "STARTS_WITH",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{Click URL}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "mailto:"
+              }
+            ]
+          }
+        ],
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "waitForTags",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "waitForTagsTimeout",
+            "value": "2000"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "checkValidation",
+            "value": "false"
+          }
+        ]
+      },
+      {
+        "triggerId": "6",
+        "name": "TR - Click Social",
+        "type": "LINK_CLICK",
+        "filter": [
+          {
+            "type": "MATCH_REGEX",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{Click URL}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "^(?:https?:)?\\/\\/(?:www\\.)?(facebook|instagram|linkedin|youtube|youtu\\.be|x\\.com|twitter|tiktok|pinterest)\\."
+              }
+            ]
+          }
+        ],
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "waitForTags",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "waitForTagsTimeout",
+            "value": "2000"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "checkValidation",
+            "value": "false"
+          }
+        ]
+      }
+    ],
+    "tag": [
+      {
+        "tagId": "1",
+        "name": "TAG - Google tag base (GA4 + Ads)",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script async src=\"https://www.googletagmanager.com/gtag/js?id={{C - GA4 Measurement ID}}\"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','{{C - GA4 Measurement ID}}');if('{{C - Google Ads Conversion ID}}' && '{{C - Google Ads Conversion ID}}' !== 'AW-XXXXXXXXXX'){gtag('config','{{C - Google Ads Conversion ID}}');}</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "1"
+        ]
+      },
+      {
+        "tagId": "2",
+        "name": "TAG - Meta Pixel Base",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{C - Meta Pixel ID}}');fbq('track','PageView');</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "1"
+        ]
+      },
+      {
+        "tagId": "3",
+        "name": "TAG - LinkedIn Insight Base",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script type='text/javascript'>_linkedin_partner_id='{{C - LinkedIn Partner ID}}';window._linkedin_data_partner_ids=window._linkedin_data_partner_ids||[];window._linkedin_data_partner_ids.push(_linkedin_partner_id);</script><script type='text/javascript'>(function(l){if(!l){window.lintrk=function(a,b){window.lintrk.q.push([a,b])};window.lintrk.q=[]}var s=document.getElementsByTagName('script')[0];var b=document.createElement('script');b.type='text/javascript';b.async=true;b.src='https://snap.licdn.com/li.lms-analytics/insight.min.js';s.parentNode.insertBefore(b,s);})(window.lintrk);</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "1"
+        ]
+      },
+      {
+        "tagId": "4",
+        "name": "GA4 - Emerus Lead Success",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','generate_lead',{lead_status:'{{DLV - Emerus Status}}',form_variant:'{{DLV - Emerus Form Variant}}',form_key:'{{DLV - Emerus Form Key}}',page_location:'{{DLV - Emerus Page URL}}',page_title:'{{DLV - Emerus Page Title}}',rows_count:'{{DLV - Emerus Rows Count}}',zoho_id:'{{DLV - Emerus Zoho ID}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "2"
+        ]
+      },
+      {
+        "tagId": "5",
+        "name": "GA4 - Emerus Lead Error",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','form_error',{form_variant:'{{DLV - Emerus Form Variant}}',form_key:'{{DLV - Emerus Form Key}}',http_status:'{{DLV - Emerus HTTP Status}}',error_message:'{{DLV - Emerus Error Message}}',page_location:'{{DLV - Emerus Page URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "3"
+        ]
+      },
+      {
+        "tagId": "6",
+        "name": "GA4 - Click Phone",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','click_phone',{click_url:'{{Click URL}}',click_text:'{{Click Text}}',page_location:'{{Page URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "4"
+        ]
+      },
+      {
+        "tagId": "7",
+        "name": "GA4 - Click Email",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','click_email',{click_url:'{{Click URL}}',click_text:'{{Click Text}}',page_location:'{{Page URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "5"
+        ]
+      },
+      {
+        "tagId": "8",
+        "name": "GA4 - Click Social",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','click_social',{social_network:'{{JS - Social Network}}',click_url:'{{Click URL}}',click_text:'{{Click Text}}',page_location:'{{Page URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "6"
+        ]
+      },
+      {
+        "tagId": "9",
+        "name": "Google Ads - Conversion Lead",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','conversion',{'send_to':'{{C - Google Ads Conversion ID}}/{{C - Google Ads Label - Lead}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "2"
+        ]
+      },
+      {
+        "tagId": "10",
+        "name": "Google Ads - Conversion Phone Click",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','conversion',{'send_to':'{{C - Google Ads Conversion ID}}/{{C - Google Ads Label - Phone Click}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "4"
+        ]
+      },
+      {
+        "tagId": "11",
+        "name": "Google Ads - Conversion Email Click",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('event','conversion',{'send_to':'{{C - Google Ads Conversion ID}}/{{C - Google Ads Label - Email Click}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "5"
+        ]
+      },
+      {
+        "tagId": "12",
+        "name": "Meta Pixel - Lead Success",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.fbq=window.fbq||function(){(window.fbq.q=window.fbq.q||[]).push(arguments)};fbq('track','Lead');</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "2"
+        ]
+      },
+      {
+        "tagId": "13",
+        "name": "Meta Pixel - Phone Click",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.fbq=window.fbq||function(){(window.fbq.q=window.fbq.q||[]).push(arguments)};fbq('trackCustom','PhoneClick',{click_url:'{{Click URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "4"
+        ]
+      },
+      {
+        "tagId": "14",
+        "name": "Meta Pixel - Email Click",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.fbq=window.fbq||function(){(window.fbq.q=window.fbq.q||[]).push(arguments)};fbq('trackCustom','EmailClick',{click_url:'{{Click URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "5"
+        ]
+      },
+      {
+        "tagId": "15",
+        "name": "Meta Pixel - Social Click",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.fbq=window.fbq||function(){(window.fbq.q=window.fbq.q||[]).push(arguments)};fbq('trackCustom','SocialClick',{social_network:'{{JS - Social Network}}',click_url:'{{Click URL}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "6"
+        ]
+      },
+      {
+        "tagId": "16",
+        "name": "LinkedIn - Lead Conversion",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.lintrk=window.lintrk||function(a,b){window.lintrk.q=window.lintrk.q||[];window.lintrk.q.push([a,b]);};window.lintrk('track',{conversion_id:'{{C - LinkedIn Conversion ID - Lead}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "2"
+        ]
+      },
+      {
+        "tagId": "17",
+        "name": "LinkedIn - Phone Click Conversion",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.lintrk=window.lintrk||function(a,b){window.lintrk.q=window.lintrk.q||[];window.lintrk.q.push([a,b]);};window.lintrk('track',{conversion_id:'{{C - LinkedIn Conversion ID - Phone Click}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "4"
+        ]
+      },
+      {
+        "tagId": "18",
+        "name": "LinkedIn - Email Click Conversion",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.lintrk=window.lintrk||function(a,b){window.lintrk.q=window.lintrk.q||[];window.lintrk.q.push([a,b]);};window.lintrk('track',{conversion_id:'{{C - LinkedIn Conversion ID - Email Click}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "5"
+        ]
+      },
+      {
+        "tagId": "19",
+        "name": "LinkedIn - Social Click Conversion",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>window.lintrk=window.lintrk||function(a,b){window.lintrk.q=window.lintrk.q||[];window.lintrk.q.push([a,b]);};window.lintrk('track',{conversion_id:'{{C - LinkedIn Conversion ID - Social Click}}'});</script>"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "supportDocumentWrite",
+            "value": "false"
+          }
+        ],
+        "firingTriggerId": [
+          "6"
+        ]
+      }
+    ],
+    "builtInVariable": [
+      {
+        "type": "PAGE_URL"
+      },
+      {
+        "type": "PAGE_HOSTNAME"
+      },
+      {
+        "type": "PAGE_PATH"
+      },
+      {
+        "type": "EVENT"
+      },
+      {
+        "type": "CLICK_URL"
+      },
+      {
+        "type": "CLICK_TEXT"
+      },
+      {
+        "type": "CLICK_CLASSES"
+      },
+      {
+        "type": "CLICK_ID"
+      },
+      {
+        "type": "CLICK_TARGET"
+      }
+    ]
+  }
+}

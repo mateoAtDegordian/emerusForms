@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.12
+ * Version: 0.4.13
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -92,6 +92,10 @@ https://wsform.com/knowledgebase/variables/#field
   var dryRun = false; // true = log payload only
   var customInterestValue = ''; // optional hard override (if set, always used as fallback)
   var customSubSource = ''; // optional override for non-plugin forms / custom grouping
+  // Optional: attach created Lead/Contact to Zoho Campaigns (list-like grouping).
+  // You can pass Campaign IDs or Campaign names. IDs are most reliable.
+  // Examples: ['3652397000000327001'] or ['Newsletter EN'].
+  var lists = [];
   // Interest source mode per form:
   // auto = form value first, then URL mapping fallback
   // form = only form value (no URL fallback)
@@ -439,6 +443,9 @@ https://wsform.com/knowledgebase/variables/#field
 
     var customSubSourceClean = cleanupValue(customSubSource);
     payload.sub_source = customSubSourceClean;
+    if (Array.isArray(lists) && lists.length) {
+      payload.lists = lists;
+    }
 
     if (dryRun) {
       var previewPayload = payload;
@@ -472,6 +479,7 @@ JS;
             'form_variant' => 'product',
             'form_key'     => 'services_products_en',
             'sub_source'   => 'Footer newsletter',
+            'lists'        => ['3652397000000327001', 'Newsletter EN'],
             'page_url'     => 'https://example.com/industrijski-profili',
             'page_title'   => 'Industrijski profili - Emerus',
             'rows'         => [
@@ -1509,6 +1517,7 @@ JS;
                                 <li><code>mapFields</code>: map form field names to Zoho API names</li>
                                 <li><code>staticLead</code>: extra fixed lead data always appended</li>
                                 <li><code>extraPayload</code>: extra top-level payload values</li>
+                                <li><code>lists</code>: optional array of Zoho Campaign IDs / names (record will be linked after create)</li>
                                 <li><code>applyI18n</code>: apply plugin WS #text translation rules before collecting values (default <code>true</code>)</li>
                             </ul>
                             <p class="description"><code>Lead_Source</code> is filled automatically from plugin settings (typically <code>Website</code>).</p>
@@ -2049,6 +2058,127 @@ JS;
         return array_values(array_unique($tags));
     }
 
+    private function resolve_zoho_lists(array $payload) {
+        $entries = [];
+
+        $push_entry = static function (&$target, $value) {
+            if (is_array($value)) {
+                $id = '';
+                if (isset($value['id'])) {
+                    $id = preg_replace('/[^0-9]/', '', (string) $value['id']);
+                } elseif (isset($value['list_id'])) {
+                    $id = preg_replace('/[^0-9]/', '', (string) $value['list_id']);
+                }
+
+                $name = '';
+                if (isset($value['name'])) {
+                    $name = sanitize_text_field((string) $value['name']);
+                } elseif (isset($value['list_name'])) {
+                    $name = sanitize_text_field((string) $value['list_name']);
+                }
+
+                $member_status = isset($value['member_status']) ? sanitize_text_field((string) $value['member_status']) : '';
+
+                if ($id === '' && $name === '') {
+                    return;
+                }
+
+                $target[] = [
+                    'id'            => $id,
+                    'name'          => $name,
+                    'member_status' => $member_status,
+                ];
+                return;
+            }
+
+            $text = sanitize_text_field((string) $value);
+            if ($text === '') {
+                return;
+            }
+
+            if (preg_match('/^\d+$/', $text)) {
+                $target[] = ['id' => $text, 'name' => '', 'member_status' => ''];
+            } else {
+                $target[] = ['id' => '', 'name' => $text, 'member_status' => ''];
+            }
+        };
+
+        if (isset($payload['lists'])) {
+            $raw_lists = $payload['lists'];
+            if (is_array($raw_lists)) {
+                foreach ($raw_lists as $item) {
+                    $push_entry($entries, $item);
+                }
+            } else {
+                $parts = array_filter(array_map('trim', explode(',', sanitize_text_field((string) $raw_lists))));
+                foreach ($parts as $part) {
+                    $push_entry($entries, $part);
+                }
+            }
+        }
+
+        if (isset($payload['list_ids'])) {
+            $raw_ids = $payload['list_ids'];
+            if (is_array($raw_ids)) {
+                foreach ($raw_ids as $id) {
+                    $push_entry($entries, ['id' => $id]);
+                }
+            } else {
+                $parts = array_filter(array_map('trim', explode(',', sanitize_text_field((string) $raw_ids))));
+                foreach ($parts as $part) {
+                    $push_entry($entries, ['id' => $part]);
+                }
+            }
+        }
+
+        if (isset($payload['list_id'])) {
+            $push_entry($entries, ['id' => $payload['list_id']]);
+        }
+
+        if (isset($payload['list_name'])) {
+            $push_entry($entries, ['name' => $payload['list_name']]);
+        }
+
+        if (isset($payload['list_names'])) {
+            $raw_names = $payload['list_names'];
+            if (is_array($raw_names)) {
+                foreach ($raw_names as $name) {
+                    $push_entry($entries, ['name' => $name]);
+                }
+            } else {
+                $parts = array_filter(array_map('trim', explode(',', sanitize_text_field((string) $raw_names))));
+                foreach ($parts as $part) {
+                    $push_entry($entries, ['name' => $part]);
+                }
+            }
+        }
+
+        $seen = [];
+        $out  = [];
+        foreach ($entries as $entry) {
+            $id   = isset($entry['id']) ? (string) $entry['id'] : '';
+            $name = isset($entry['name']) ? (string) $entry['name'] : '';
+            $status = isset($entry['member_status']) ? (string) $entry['member_status'] : '';
+            if ($id === '' && $name === '') {
+                continue;
+            }
+
+            $key = $id !== '' ? 'id:' . $id : 'name:' . strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $out[] = [
+                'id'            => $id,
+                'name'          => $name,
+                'member_status' => $status,
+            ];
+        }
+
+        return $out;
+    }
+
     private function sub_source_rule_matches($match, $form_key, $variant) {
         $tokens = array_filter(array_map('trim', explode(',', (string) $match)));
         if (empty($tokens)) {
@@ -2199,6 +2329,7 @@ JS;
 
         $resolved_module = $this->resolve_zoho_module($payload, $options);
         $resolved_tags = $this->resolve_zoho_tags($payload);
+        $resolved_lists = $this->resolve_zoho_lists($payload);
         $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode($resolved_module);
         $zoho_request = ['data' => [$lead]];
 
@@ -2216,6 +2347,7 @@ JS;
                     'fieldMapCount'     => count($field_map_rows),
                     'resolvedModule'    => $resolved_module,
                     'resolvedTags'      => $resolved_tags,
+                    'resolvedLists'     => $resolved_lists,
                 ],
             ], 200);
         }
@@ -2257,14 +2389,15 @@ JS;
         }
 
         $tag_result = null;
-        if (!empty($resolved_tags)) {
-            $created_id = '';
-            if (is_array($json_body)
-                && !empty($json_body['data'][0]['details']['id'])
-            ) {
-                $created_id = (string) $json_body['data'][0]['details']['id'];
-            }
+        $list_result = null;
+        $created_id = '';
+        if (is_array($json_body)
+            && !empty($json_body['data'][0]['details']['id'])
+        ) {
+            $created_id = (string) $json_body['data'][0]['details']['id'];
+        }
 
+        if (!empty($resolved_tags)) {
             if ($created_id !== '') {
                 $tag_result = $this->zoho_add_tags_to_record(
                     (string) $options['zoho_api_base'],
@@ -2279,6 +2412,23 @@ JS;
             }
         }
 
+        if (!empty($resolved_lists)) {
+            if ($created_id === '') {
+                $list_result = new WP_Error('emerus_zoho_list_missing_record', 'Could not resolve record ID for list assignment.');
+            } elseif (!in_array(strtolower((string) $resolved_module), ['leads', 'contacts'], true)) {
+                $list_result = new WP_Error('emerus_zoho_list_module_not_supported', 'List assignment is supported only for Leads or Contacts module.');
+            } else {
+                $list_result = $this->zoho_add_to_campaign_lists(
+                    (string) $options['zoho_api_base'],
+                    $resolved_module,
+                    $created_id,
+                    (string) $token,
+                    (int) $options['zoho_timeout'],
+                    $resolved_lists
+                );
+            }
+        }
+
         return new WP_REST_Response([
             'success'  => true,
             'httpCode' => $http_code,
@@ -2288,6 +2438,12 @@ JS;
                 'result'    => is_wp_error($tag_result)
                     ? ['success' => false, 'error' => $tag_result->get_error_message(), 'data' => $tag_result->get_error_data()]
                     : (is_array($tag_result) ? $tag_result : null),
+            ],
+            'lists'    => [
+                'requested' => $resolved_lists,
+                'result'    => is_wp_error($list_result)
+                    ? ['success' => false, 'error' => $list_result->get_error_message(), 'data' => $list_result->get_error_data()]
+                    : (is_array($list_result) ? $list_result : null),
             ],
         ], 200);
     }
@@ -2446,6 +2602,169 @@ JS;
             'success'  => true,
             'httpCode' => $http_code,
             'response' => $json_body,
+        ];
+    }
+
+    private function zoho_resolve_campaign_id_by_name($api_base, $token, $timeout, $campaign_name) {
+        $campaign_name = sanitize_text_field((string) $campaign_name);
+        if ($campaign_name === '') {
+            return '';
+        }
+
+        $api_url = trailingslashit((string) $api_base)
+            . 'crm/v8/Campaigns/search?word='
+            . rawurlencode($campaign_name)
+            . '&fields=Campaign_Name';
+
+        $request = $this->zoho_send_get_request($api_url, $token, (int) $timeout);
+        if (is_wp_error($request)) {
+            return $request;
+        }
+
+        $http_code = (int) $request['httpCode'];
+        $json_body = $request['jsonBody'];
+        $raw_body  = (string) $request['rawBody'];
+
+        if ($http_code === 204) {
+            return '';
+        }
+
+        if ($http_code < 200 || $http_code >= 300) {
+            return new WP_Error('emerus_zoho_list_lookup_error', 'Zoho campaign lookup failed.', [
+                'status'   => 502,
+                'httpCode' => $http_code,
+                'response' => $json_body ?: $raw_body,
+                'campaign' => $campaign_name,
+            ]);
+        }
+
+        if (empty($json_body['data']) || !is_array($json_body['data'])) {
+            return '';
+        }
+
+        $fallback_id = '';
+        foreach ($json_body['data'] as $row) {
+            if (!is_array($row) || empty($row['id'])) {
+                continue;
+            }
+            $id = preg_replace('/[^0-9]/', '', (string) $row['id']);
+            if ($id === '') {
+                continue;
+            }
+
+            if ($fallback_id === '') {
+                $fallback_id = $id;
+            }
+
+            $row_name = '';
+            if (isset($row['Campaign_Name'])) {
+                $row_name = sanitize_text_field((string) $row['Campaign_Name']);
+            } elseif (isset($row['Name'])) {
+                $row_name = sanitize_text_field((string) $row['Name']);
+            }
+
+            if ($row_name !== '' && strtolower($row_name) === strtolower($campaign_name)) {
+                return $id;
+            }
+        }
+
+        return $fallback_id;
+    }
+
+    private function zoho_add_to_campaign_lists($api_base, $module, $record_id, $token, $timeout, array $lists) {
+        if (empty($lists)) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $resolved = [];
+        $unresolved = [];
+        foreach ($lists as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $id = isset($entry['id']) ? preg_replace('/[^0-9]/', '', (string) $entry['id']) : '';
+            $name = isset($entry['name']) ? sanitize_text_field((string) $entry['name']) : '';
+            $member_status = isset($entry['member_status']) ? sanitize_text_field((string) $entry['member_status']) : '';
+
+            if ($id === '' && $name !== '') {
+                $resolved_id = $this->zoho_resolve_campaign_id_by_name($api_base, $token, $timeout, $name);
+                if (is_wp_error($resolved_id)) {
+                    return $resolved_id;
+                }
+                $id = (string) $resolved_id;
+            }
+
+            if ($id === '') {
+                $unresolved[] = ['name' => $name];
+                continue;
+            }
+
+            $resolved[] = [
+                'id'            => $id,
+                'name'          => $name,
+                'member_status' => $member_status,
+            ];
+        }
+
+        if (empty($resolved)) {
+            return new WP_Error('emerus_zoho_list_no_resolved_ids', 'No valid campaign list IDs were resolved from payload.', [
+                'status'    => 400,
+                'requested' => $lists,
+                'unresolved' => $unresolved,
+            ]);
+        }
+
+        $data_rows = [];
+        foreach ($resolved as $item) {
+            $row = ['id' => (string) $item['id']];
+            if (!empty($item['member_status'])) {
+                $row['Member_Status'] = (string) $item['member_status'];
+            }
+            $data_rows[] = $row;
+        }
+
+        $api_url = trailingslashit((string) $api_base)
+            . 'crm/v8/'
+            . rawurlencode((string) $module)
+            . '/'
+            . rawurlencode((string) $record_id)
+            . '/Campaigns';
+
+        $response = wp_remote_request((string) $api_url, [
+            'method'  => 'PUT',
+            'timeout' => (int) $timeout,
+            'headers' => [
+                'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode(['data' => $data_rows]),
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_Error('emerus_zoho_list_request_error', $response->get_error_message(), ['status' => 500]);
+        }
+
+        $http_code = (int) wp_remote_retrieve_response_code($response);
+        $raw_body  = (string) wp_remote_retrieve_body($response);
+        $json_body = json_decode($raw_body, true);
+
+        if ($http_code < 200 || $http_code >= 300) {
+            return new WP_Error('emerus_zoho_list_error', 'Zoho list assignment request failed.', [
+                'status'    => 502,
+                'httpCode'  => $http_code,
+                'response'  => $json_body ?: $raw_body,
+                'resolved'  => $resolved,
+                'unresolved'=> $unresolved,
+            ]);
+        }
+
+        return [
+            'success'    => true,
+            'httpCode'   => $http_code,
+            'resolved'   => $resolved,
+            'unresolved' => $unresolved,
+            'response'   => $json_body,
         ];
     }
 

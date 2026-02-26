@@ -157,6 +157,7 @@ var rows = Object.keys(lead)
 await window.EmerusZoho.sendLead({
   form_variant: 'product',
   form_key: 'services_products_en',
+  lists: ['3652397000000327001', 'Newsletter EN'], // optional: Zoho Campaign IDs or names
   page_url: window.location.href,
   page_title: document.title,
   rows,
@@ -181,6 +182,7 @@ Main options for `sendWsForm(form, options)`:
 - `mapFields`: object for field name mapping
 - `staticLead`: object merged into `lead`
 - `extraPayload`: object merged at payload root
+- `extraPayload.lists`: optional campaign/list assignment array (IDs or names)
 - `applyI18n`: auto-apply plugin i18n field rules before collecting values (default `true`)
 
 ## Zoho Backend API
@@ -205,6 +207,7 @@ window.EmerusZoho.sendLead({
   form_variant: 'hero', // or 'product'
   page_url: window.location.href,
   page_title: document.title,
+  lists: ['3652397000000327001'], // optional campaign/list IDs (or names)
   lead: {
     Last_Name: 'Website Lead',
     Email: 'john@example.com',
@@ -222,6 +225,7 @@ Alternative payload (same as your tested PHP):
 ```js
 window.EmerusZoho.sendLead({
   form_variant: 'product',
+  lists: ['3652397000000327001', 'Newsletter EN'],
   rows: [
     { k: 'Last_Name', v: 'Website Lead' },
     { k: 'Email', v: 'john@example.com' }
@@ -232,3 +236,5 @@ window.EmerusZoho.sendLead({
 ## Notes
 
 - If both variants target a page, product variant can replace hero (setting available).
+- `lists` payload is processed backend after lead/contact create, by linking the new record to Zoho `Campaigns` related list.
+- Best practice: send Campaign IDs in `lists` for reliability. Names are resolved via Campaign search.
