@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emerus WS Forms Overlay
  * Description: Injects WS Form overlays in Bricks hero sections with page targeting, EN/HR copy, and optional Zoho CRM lead forwarding.
- * Version: 0.4.13
+ * Version: 0.4.14
  * Author: Emerus
  * Text Domain: emerus-wsforms-overlay
  */
@@ -92,9 +92,8 @@ https://wsform.com/knowledgebase/variables/#field
   var dryRun = false; // true = log payload only
   var customInterestValue = ''; // optional hard override (if set, always used as fallback)
   var customSubSource = ''; // optional override for non-plugin forms / custom grouping
-  // Optional: attach created Lead/Contact to Zoho Campaigns (list-like grouping).
-  // You can pass Campaign IDs or Campaign names. IDs are most reliable.
-  // Examples: ['3652397000000327001'] or ['Newsletter EN'].
+  // Optional: subscribe to Zoho Campaigns lists by list key / ID.
+  // Example: ['3zd0e1436524a...'].
   var lists = [];
   // Interest source mode per form:
   // auto = form value first, then URL mapping fallback
@@ -479,7 +478,7 @@ JS;
             'form_variant' => 'product',
             'form_key'     => 'services_products_en',
             'sub_source'   => 'Footer newsletter',
-            'lists'        => ['3652397000000327001', 'Newsletter EN'],
+            'lists'        => ['3zd0e1436524a9384bd0a0c25503f37f8de5c927d6a56bdbc3389723fea607135'],
             'page_url'     => 'https://example.com/industrijski-profili',
             'page_title'   => 'Industrijski profili - Emerus',
             'rows'         => [
@@ -576,6 +575,16 @@ JS;
             'zoho_sub_source_field_api'  => '',
             'zoho_page_url_field_api'    => '',
             'zoho_page_title_field_api'  => '',
+            'zoho_campaigns_lists_enabled'      => 0,
+            'zoho_campaigns_base'               => 'https://campaigns.zoho.eu',
+            'zoho_campaigns_source'             => 'Website',
+            'zoho_campaigns_list_general'       => '',
+            'zoho_campaigns_list_newsletter'    => '',
+            'zoho_campaigns_list_gated'         => '',
+            'zoho_campaigns_list_industrijski'  => '',
+            'zoho_campaigns_list_solarni'       => '',
+            'zoho_campaigns_list_gradevinski'   => '',
+            'zoho_campaigns_interest_map'       => [],
         ];
     }
 
@@ -672,6 +681,16 @@ JS;
             'zoho_sub_source_field_api'  => isset($raw['zoho_sub_source_field_api']) ? sanitize_text_field($raw['zoho_sub_source_field_api']) : $defaults['zoho_sub_source_field_api'],
             'zoho_page_url_field_api'    => isset($raw['zoho_page_url_field_api']) ? sanitize_text_field($raw['zoho_page_url_field_api']) : $defaults['zoho_page_url_field_api'],
             'zoho_page_title_field_api'  => isset($raw['zoho_page_title_field_api']) ? sanitize_text_field($raw['zoho_page_title_field_api']) : $defaults['zoho_page_title_field_api'],
+            'zoho_campaigns_lists_enabled'      => !empty($raw['zoho_campaigns_lists_enabled']) ? 1 : 0,
+            'zoho_campaigns_base'               => isset($raw['zoho_campaigns_base']) ? esc_url_raw(trim((string) $raw['zoho_campaigns_base'])) : $defaults['zoho_campaigns_base'],
+            'zoho_campaigns_source'             => isset($raw['zoho_campaigns_source']) ? sanitize_text_field($raw['zoho_campaigns_source']) : $defaults['zoho_campaigns_source'],
+            'zoho_campaigns_list_general'       => isset($raw['zoho_campaigns_list_general']) ? sanitize_text_field($raw['zoho_campaigns_list_general']) : $defaults['zoho_campaigns_list_general'],
+            'zoho_campaigns_list_newsletter'    => isset($raw['zoho_campaigns_list_newsletter']) ? sanitize_text_field($raw['zoho_campaigns_list_newsletter']) : $defaults['zoho_campaigns_list_newsletter'],
+            'zoho_campaigns_list_gated'         => isset($raw['zoho_campaigns_list_gated']) ? sanitize_text_field($raw['zoho_campaigns_list_gated']) : $defaults['zoho_campaigns_list_gated'],
+            'zoho_campaigns_list_industrijski'  => isset($raw['zoho_campaigns_list_industrijski']) ? sanitize_text_field($raw['zoho_campaigns_list_industrijski']) : $defaults['zoho_campaigns_list_industrijski'],
+            'zoho_campaigns_list_solarni'       => isset($raw['zoho_campaigns_list_solarni']) ? sanitize_text_field($raw['zoho_campaigns_list_solarni']) : $defaults['zoho_campaigns_list_solarni'],
+            'zoho_campaigns_list_gradevinski'   => isset($raw['zoho_campaigns_list_gradevinski']) ? sanitize_text_field($raw['zoho_campaigns_list_gradevinski']) : $defaults['zoho_campaigns_list_gradevinski'],
+            'zoho_campaigns_interest_map'       => $this->sanitize_key_value_rows(isset($raw['zoho_campaigns_interest_map']) ? (array) $raw['zoho_campaigns_interest_map'] : []),
         ];
 
         return $options;
@@ -1459,6 +1478,63 @@ JS;
                         <td><input type="text" id="zoho_page_title_field_api" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_page_title_field_api]" value="<?php echo esc_attr($options['zoho_page_title_field_api']); ?>" class="regular-text code" /></td>
                     </tr>
                     <tr>
+                        <th scope="row">Enable Campaigns list subscribe</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_lists_enabled]" value="1" <?php checked((int) $options['zoho_campaigns_lists_enabled'], 1); ?> />
+                                Subscribe contacts to Zoho Campaigns lists by list key / ID.
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_base">Campaigns base URL</label></th>
+                        <td>
+                            <input type="url" id="zoho_campaigns_base" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_base]" value="<?php echo esc_attr($options['zoho_campaigns_base']); ?>" class="regular-text code" />
+                            <p class="description">Example: <code>https://campaigns.zoho.eu</code>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_source">Campaigns source</label></th>
+                        <td>
+                            <input type="text" id="zoho_campaigns_source" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_source]" value="<?php echo esc_attr($options['zoho_campaigns_source']); ?>" class="regular-text" />
+                            <p class="description">Sent as <code>source</code> in list subscribe API (default <code>Website</code>).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_general">List key/ID (all forms)</label></th>
+                        <td>
+                            <input type="text" id="zoho_campaigns_list_general" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_general]" value="<?php echo esc_attr($options['zoho_campaigns_list_general']); ?>" class="regular-text code" />
+                            <p class="description">Always subscribed for every successful form submit.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_newsletter">List key/ID (newsletter)</label></th>
+                        <td><input type="text" id="zoho_campaigns_list_newsletter" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_newsletter]" value="<?php echo esc_attr($options['zoho_campaigns_list_newsletter']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_gated">List key/ID (gated)</label></th>
+                        <td><input type="text" id="zoho_campaigns_list_gated" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_gated]" value="<?php echo esc_attr($options['zoho_campaigns_list_gated']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_industrijski">List key/ID (Industrijski)</label></th>
+                        <td><input type="text" id="zoho_campaigns_list_industrijski" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_industrijski]" value="<?php echo esc_attr($options['zoho_campaigns_list_industrijski']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_solarni">List key/ID (Solarni)</label></th>
+                        <td><input type="text" id="zoho_campaigns_list_solarni" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_solarni]" value="<?php echo esc_attr($options['zoho_campaigns_list_solarni']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="zoho_campaigns_list_gradevinski">List key/ID (Građevinski)</label></th>
+                        <td><input type="text" id="zoho_campaigns_list_gradevinski" name="<?php echo esc_attr(self::OPTION_KEY); ?>[zoho_campaigns_list_gradevinski]" value="<?php echo esc_attr($options['zoho_campaigns_list_gradevinski']); ?>" class="regular-text code" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Interes text -> list key mapping</th>
+                        <td>
+                            <p class="description">Optional extra routing rules. Match by text contains (case/accent insensitive). Example: <code>solarni|LIST_KEY_HERE</code>.</p>
+                            <?php $this->render_key_value_rows_table('zoho_campaigns_interest_map', isset($options['zoho_campaigns_interest_map']) ? (array) $options['zoho_campaigns_interest_map'] : [], ['Interes match text', 'List key/ID']); ?>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row">Available Zoho fields (module)</th>
                         <td>
                             <p>
@@ -1517,7 +1593,7 @@ JS;
                                 <li><code>mapFields</code>: map form field names to Zoho API names</li>
                                 <li><code>staticLead</code>: extra fixed lead data always appended</li>
                                 <li><code>extraPayload</code>: extra top-level payload values</li>
-                                <li><code>lists</code>: optional array of Zoho Campaign IDs / names (record will be linked after create)</li>
+                                <li><code>lists</code>: optional array of Zoho Campaigns list keys/IDs (subscribe API)</li>
                                 <li><code>applyI18n</code>: apply plugin WS #text translation rules before collecting values (default <code>true</code>)</li>
                             </ul>
                             <p class="description"><code>Lead_Source</code> is filled automatically from plugin settings (typically <code>Website</code>).</p>
@@ -2061,19 +2137,21 @@ JS;
     private function resolve_zoho_lists(array $payload) {
         $entries = [];
 
-        $push_entry = static function (&$target, $value) {
+        $push_entry = static function (&$target, $value, $allow_name = true) {
             if (is_array($value)) {
                 $id = '';
                 if (isset($value['id'])) {
-                    $id = preg_replace('/[^0-9]/', '', (string) $value['id']);
+                    $raw_id = trim((string) $value['id']);
+                    $id = preg_match('/^\d+$/', $raw_id) ? $raw_id : '';
                 } elseif (isset($value['list_id'])) {
-                    $id = preg_replace('/[^0-9]/', '', (string) $value['list_id']);
+                    $raw_id = trim((string) $value['list_id']);
+                    $id = preg_match('/^\d+$/', $raw_id) ? $raw_id : '';
                 }
 
                 $name = '';
-                if (isset($value['name'])) {
+                if ($allow_name && isset($value['name'])) {
                     $name = sanitize_text_field((string) $value['name']);
-                } elseif (isset($value['list_name'])) {
+                } elseif ($allow_name && isset($value['list_name'])) {
                     $name = sanitize_text_field((string) $value['list_name']);
                 }
 
@@ -2098,27 +2176,42 @@ JS;
 
             if (preg_match('/^\d+$/', $text)) {
                 $target[] = ['id' => $text, 'name' => '', 'member_status' => ''];
-            } else {
+            } elseif ($allow_name) {
                 $target[] = ['id' => '', 'name' => $text, 'member_status' => ''];
             }
         };
 
-        if (isset($payload['lists'])) {
-            $raw_lists = $payload['lists'];
+        if (isset($payload['crm_lists'])) {
+            $raw_lists = $payload['crm_lists'];
             if (is_array($raw_lists)) {
                 foreach ($raw_lists as $item) {
-                    $push_entry($entries, $item);
+                    $push_entry($entries, $item, true);
                 }
             } else {
                 $parts = array_filter(array_map('trim', explode(',', sanitize_text_field((string) $raw_lists))));
                 foreach ($parts as $part) {
-                    $push_entry($entries, $part);
+                    $push_entry($entries, $part, true);
                 }
             }
         }
 
-        if (isset($payload['list_ids'])) {
-            $raw_ids = $payload['list_ids'];
+        // Backward-compatibility only: if legacy `lists` is present, accept numeric IDs only.
+        if (isset($payload['lists'])) {
+            $raw_lists = $payload['lists'];
+            if (is_array($raw_lists)) {
+                foreach ($raw_lists as $item) {
+                    $push_entry($entries, $item, false);
+                }
+            } else {
+                $parts = array_filter(array_map('trim', explode(',', sanitize_text_field((string) $raw_lists))));
+                foreach ($parts as $part) {
+                    $push_entry($entries, $part, false);
+                }
+            }
+        }
+
+        if (isset($payload['crm_list_ids'])) {
+            $raw_ids = $payload['crm_list_ids'];
             if (is_array($raw_ids)) {
                 foreach ($raw_ids as $id) {
                     $push_entry($entries, ['id' => $id]);
@@ -2131,16 +2224,16 @@ JS;
             }
         }
 
-        if (isset($payload['list_id'])) {
-            $push_entry($entries, ['id' => $payload['list_id']]);
+        if (isset($payload['crm_list_id'])) {
+            $push_entry($entries, ['id' => $payload['crm_list_id']]);
         }
 
-        if (isset($payload['list_name'])) {
-            $push_entry($entries, ['name' => $payload['list_name']]);
+        if (isset($payload['crm_list_name'])) {
+            $push_entry($entries, ['name' => $payload['crm_list_name']]);
         }
 
-        if (isset($payload['list_names'])) {
-            $raw_names = $payload['list_names'];
+        if (isset($payload['crm_list_names'])) {
+            $raw_names = $payload['crm_list_names'];
             if (is_array($raw_names)) {
                 foreach ($raw_names as $name) {
                     $push_entry($entries, ['name' => $name]);
@@ -2177,6 +2270,356 @@ JS;
         }
 
         return $out;
+    }
+
+    private function sanitize_campaign_list_key($value) {
+        $key = trim(sanitize_text_field((string) $value));
+        if ($key === '') {
+            return '';
+        }
+        if (!preg_match('/^[A-Za-z0-9_-]+$/', $key)) {
+            return '';
+        }
+        return $key;
+    }
+
+    private function normalize_match_text($value) {
+        $value = sanitize_text_field((string) $value);
+        $value = strtolower(remove_accents($value));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value);
+        $value = preg_replace('/\s+/', ' ', (string) $value);
+        return trim((string) $value);
+    }
+
+    private function first_non_empty_scalar(array $values) {
+        foreach ($values as $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $text = trim((string) $value);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+        return '';
+    }
+
+    private function resolve_interest_text_for_lists(array $payload, array $lead_unmapped, array $lead_mapped) {
+        $payload_interest = '';
+        if (!empty($payload['interest']) && is_scalar($payload['interest'])) {
+            $payload_interest = sanitize_text_field((string) $payload['interest']);
+        } elseif (!empty($payload['interes']) && is_scalar($payload['interes'])) {
+            $payload_interest = sanitize_text_field((string) $payload['interes']);
+        }
+
+        $lead_interest = $this->first_non_empty_scalar([
+            isset($lead_unmapped['Interes']) ? $lead_unmapped['Interes'] : '',
+            isset($lead_unmapped['Proizvod/Usluga']) ? $lead_unmapped['Proizvod/Usluga'] : '',
+            isset($lead_unmapped['Zanimacija za']) ? $lead_unmapped['Zanimacija za'] : '',
+            isset($lead_mapped['Interes']) ? $lead_mapped['Interes'] : '',
+            isset($lead_mapped['Proizvod_Usluga']) ? $lead_mapped['Proizvod_Usluga'] : '',
+            isset($lead_mapped['Zanimacija_za']) ? $lead_mapped['Zanimacija_za'] : '',
+        ]);
+
+        return $payload_interest !== '' ? $payload_interest : sanitize_text_field($lead_interest);
+    }
+
+    private function resolve_interest_bucket($interest_text) {
+        $value = $this->normalize_match_text($interest_text);
+        if ($value === '') {
+            return '';
+        }
+        if (strpos($value, 'solarn') !== false || strpos($value, 'solar') !== false) {
+            return 'solarni';
+        }
+        if (strpos($value, 'industr') !== false) {
+            return 'industrijski';
+        }
+        if (strpos($value, 'gradevin') !== false || strpos($value, 'gradjev') !== false || strpos($value, 'building') !== false) {
+            return 'gradevinski';
+        }
+        return '';
+    }
+
+    private function payload_context_contains($value, $needle) {
+        $haystack = $this->normalize_match_text($value);
+        $needle = $this->normalize_match_text($needle);
+        if ($haystack === '' || $needle === '') {
+            return false;
+        }
+        return strpos($haystack, $needle) !== false;
+    }
+
+    private function extract_campaign_list_keys_from_payload(array $payload) {
+        $keys = [];
+
+        $push_key = function ($value) use (&$keys) {
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    $this_key = '';
+                    if (is_array($item)) {
+                        $this_key = $this->sanitize_campaign_list_key(
+                            isset($item['list_key']) ? $item['list_key'] :
+                            (isset($item['key']) ? $item['key'] :
+                            (isset($item['list_id']) ? $item['list_id'] :
+                            (isset($item['id']) ? $item['id'] :
+                            (isset($item['value']) ? $item['value'] : ''))))
+                        );
+                    } else {
+                        $this_key = $this->sanitize_campaign_list_key($item);
+                    }
+                    if ($this_key !== '') {
+                        $keys[] = $this_key;
+                    }
+                }
+                return;
+            }
+
+            $raw = sanitize_text_field((string) $value);
+            if ($raw === '') {
+                return;
+            }
+            foreach (array_filter(array_map('trim', explode(',', $raw))) as $part) {
+                $this_key = $this->sanitize_campaign_list_key($part);
+                if ($this_key !== '') {
+                    $keys[] = $this_key;
+                }
+            }
+        };
+
+        $payload_fields = [
+            'campaign_list_key',
+            'campaign_list_keys',
+            'campaign_lists',
+            'list_key',
+            'list_keys',
+            'list_id',
+            'list_ids',
+            'lists',
+        ];
+
+        foreach ($payload_fields as $field) {
+            if (!array_key_exists($field, $payload)) {
+                continue;
+            }
+            $push_key($payload[$field]);
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    private function resolve_zoho_campaign_list_keys(array $payload, array $lead_unmapped, array $lead_mapped, array $options, $variant, $resolved_sub_source, $resolved_module) {
+        $manual_keys = $this->extract_campaign_list_keys_from_payload($payload);
+        $auto_keys = [];
+        $form_variant = strtolower(trim((string) $variant));
+        $form_key = strtolower(trim(sanitize_text_field(isset($payload['form_key']) ? (string) $payload['form_key'] : '')));
+        $form_id = absint(isset($payload['form_id']) ? $payload['form_id'] : (isset($payload['formId']) ? $payload['formId'] : 0));
+        $sub_source = strtolower(trim(sanitize_text_field((string) $resolved_sub_source)));
+        $module = strtolower(trim((string) $resolved_module));
+
+        $is_newsletter = $form_id === 2
+            || $module === 'contacts'
+            || $this->payload_context_contains($form_variant, 'newsletter')
+            || $this->payload_context_contains($form_key, 'newsletter')
+            || $this->payload_context_contains($sub_source, 'newsletter');
+
+        $is_gated = $this->payload_context_contains($form_variant, 'gated')
+            || $this->payload_context_contains($form_key, 'gated')
+            || $this->payload_context_contains($sub_source, 'gated');
+
+        if ((int) $options['zoho_campaigns_lists_enabled'] === 1) {
+            $general = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_general']) ? $options['zoho_campaigns_list_general'] : '');
+            if ($general !== '') {
+                $auto_keys[] = $general;
+            }
+
+            if ($is_newsletter) {
+                $newsletter = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_newsletter']) ? $options['zoho_campaigns_list_newsletter'] : '');
+                if ($newsletter !== '') {
+                    $auto_keys[] = $newsletter;
+                }
+            }
+
+            if ($is_gated) {
+                $gated = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_gated']) ? $options['zoho_campaigns_list_gated'] : '');
+                if ($gated !== '') {
+                    $auto_keys[] = $gated;
+                }
+            }
+
+            $interest_text = $this->resolve_interest_text_for_lists($payload, $lead_unmapped, $lead_mapped);
+            $interest_bucket = $this->resolve_interest_bucket($interest_text);
+            if ($interest_bucket === 'industrijski') {
+                $key = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_industrijski']) ? $options['zoho_campaigns_list_industrijski'] : '');
+                if ($key !== '') {
+                    $auto_keys[] = $key;
+                }
+            } elseif ($interest_bucket === 'solarni') {
+                $key = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_solarni']) ? $options['zoho_campaigns_list_solarni'] : '');
+                if ($key !== '') {
+                    $auto_keys[] = $key;
+                }
+            } elseif ($interest_bucket === 'gradevinski') {
+                $key = $this->sanitize_campaign_list_key(isset($options['zoho_campaigns_list_gradevinski']) ? $options['zoho_campaigns_list_gradevinski'] : '');
+                if ($key !== '') {
+                    $auto_keys[] = $key;
+                }
+            }
+
+            $normalized_interest = $this->normalize_match_text($interest_text);
+            $rules = isset($options['zoho_campaigns_interest_map']) && is_array($options['zoho_campaigns_interest_map'])
+                ? $options['zoho_campaigns_interest_map']
+                : [];
+            if ($normalized_interest !== '' && !empty($rules)) {
+                foreach ($rules as $rule) {
+                    if (!is_array($rule)) {
+                        continue;
+                    }
+                    $match = $this->normalize_match_text(isset($rule['match']) ? $rule['match'] : '');
+                    $value = $this->sanitize_campaign_list_key(isset($rule['value']) ? $rule['value'] : '');
+                    if ($match === '' || $value === '') {
+                        continue;
+                    }
+                    if (strpos($normalized_interest, $match) !== false) {
+                        $auto_keys[] = $value;
+                    }
+                }
+            }
+        } else {
+            $interest_text = $this->resolve_interest_text_for_lists($payload, $lead_unmapped, $lead_mapped);
+            $interest_bucket = $this->resolve_interest_bucket($interest_text);
+        }
+
+        $resolved_keys = array_values(array_unique(array_merge($manual_keys, $auto_keys)));
+
+        return [
+            'keys'    => $resolved_keys,
+            'manual'  => array_values(array_unique($manual_keys)),
+            'auto'    => array_values(array_unique($auto_keys)),
+            'context' => [
+                'form_id'       => $form_id,
+                'form_key'      => $form_key,
+                'form_variant'  => $form_variant,
+                'module'        => $module,
+                'sub_source'    => $sub_source,
+                'is_newsletter' => $is_newsletter,
+                'is_gated'      => $is_gated,
+                'interest'      => isset($interest_text) ? sanitize_text_field((string) $interest_text) : '',
+                'bucket'        => isset($interest_bucket) ? (string) $interest_bucket : '',
+            ],
+        ];
+    }
+
+    private function resolve_campaigns_contact_info(array $lead_unmapped, array $lead_mapped) {
+        $email = sanitize_email($this->first_non_empty_scalar([
+            isset($lead_unmapped['Email']) ? $lead_unmapped['Email'] : '',
+            isset($lead_mapped['Email']) ? $lead_mapped['Email'] : '',
+            isset($lead_mapped['Secondary_Email']) ? $lead_mapped['Secondary_Email'] : '',
+        ]));
+
+        $first_name = sanitize_text_field($this->first_non_empty_scalar([
+            isset($lead_unmapped['First_Name']) ? $lead_unmapped['First_Name'] : '',
+            isset($lead_mapped['First_Name']) ? $lead_mapped['First_Name'] : '',
+        ]));
+
+        $last_name = sanitize_text_field($this->first_non_empty_scalar([
+            isset($lead_unmapped['Last_Name']) ? $lead_unmapped['Last_Name'] : '',
+            isset($lead_mapped['Last_Name']) ? $lead_mapped['Last_Name'] : '',
+        ]));
+
+        $phone = sanitize_text_field($this->first_non_empty_scalar([
+            isset($lead_unmapped['Phone']) ? $lead_unmapped['Phone'] : '',
+            isset($lead_mapped['Phone']) ? $lead_mapped['Phone'] : '',
+            isset($lead_mapped['Mobile']) ? $lead_mapped['Mobile'] : '',
+        ]));
+
+        if ($last_name === '' && $first_name !== '') {
+            $last_name = $first_name;
+        }
+        if ($last_name === '') {
+            $last_name = 'Website Lead';
+        }
+
+        return [
+            'Email'      => $email,
+            'First Name' => $first_name,
+            'Last Name'  => $last_name,
+            'Phone'      => $phone,
+        ];
+    }
+
+    private function zoho_campaigns_subscribe_lists($campaigns_base, $token, $timeout, $source, array $list_keys, array $contact_info) {
+        if (empty($list_keys)) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $email = isset($contact_info['Email']) ? sanitize_email((string) $contact_info['Email']) : '';
+        if ($email === '') {
+            return new WP_Error('emerus_zoho_campaigns_missing_email', 'Campaign list subscribe requires Email in lead payload.', ['status' => 400]);
+        }
+
+        $api_url = trailingslashit((string) $campaigns_base) . 'api/v1.1/json/listsubscribe';
+        $final_source = sanitize_text_field((string) $source);
+        if ($final_source === '') {
+            $final_source = 'Website';
+        }
+
+        $results = [];
+        $all_ok = true;
+        foreach ($list_keys as $list_key) {
+            $clean_key = $this->sanitize_campaign_list_key($list_key);
+            if ($clean_key === '') {
+                continue;
+            }
+
+            $body = [
+                'resfmt'      => 'JSON',
+                'listkey'     => $clean_key,
+                'source'      => $final_source,
+                'contactinfo' => wp_json_encode($contact_info, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ];
+
+            $response = wp_remote_post((string) $api_url, [
+                'timeout' => (int) $timeout,
+                'headers' => [
+                    'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                    'Content-Type'  => 'application/x-www-form-urlencoded; charset=utf-8',
+                ],
+                'body' => $body,
+            ]);
+
+            if (is_wp_error($response)) {
+                $all_ok = false;
+                $results[] = [
+                    'list_key' => $clean_key,
+                    'success'  => false,
+                    'error'    => $response->get_error_message(),
+                ];
+                continue;
+            }
+
+            $http_code = (int) wp_remote_retrieve_response_code($response);
+            $raw_body = (string) wp_remote_retrieve_body($response);
+            $json_body = json_decode($raw_body, true);
+            $status = is_array($json_body) && isset($json_body['status']) ? strtolower((string) $json_body['status']) : '';
+            $ok = ($http_code >= 200 && $http_code < 300 && $status !== 'error');
+            if (!$ok) {
+                $all_ok = false;
+            }
+
+            $results[] = [
+                'list_key' => $clean_key,
+                'success'  => $ok,
+                'httpCode' => $http_code,
+                'response' => $json_body ?: $raw_body,
+            ];
+        }
+
+        return [
+            'success'  => $all_ok,
+            'httpCode' => $all_ok ? 200 : 502,
+            'result'   => $results,
+        ];
     }
 
     private function sub_source_rule_matches($match, $form_key, $variant) {
@@ -2282,6 +2725,8 @@ JS;
             $lead = $this->build_lead_from_rows(isset($payload['rows']) ? (array) $payload['rows'] : []);
         }
 
+        $lead_unmapped = $lead;
+
         $field_map_rows = isset($options['zoho_field_map']) && is_array($options['zoho_field_map'])
             ? $options['zoho_field_map']
             : [];
@@ -2330,6 +2775,15 @@ JS;
         $resolved_module = $this->resolve_zoho_module($payload, $options);
         $resolved_tags = $this->resolve_zoho_tags($payload);
         $resolved_lists = $this->resolve_zoho_lists($payload);
+        $resolved_campaign_lists = $this->resolve_zoho_campaign_list_keys(
+            $payload,
+            $lead_unmapped,
+            $lead,
+            $options,
+            $variant,
+            $resolved_sub_source,
+            $resolved_module
+        );
         $api_url = trailingslashit((string) $options['zoho_api_base']) . 'crm/v2/' . rawurlencode($resolved_module);
         $zoho_request = ['data' => [$lead]];
 
@@ -2348,6 +2802,7 @@ JS;
                     'resolvedModule'    => $resolved_module,
                     'resolvedTags'      => $resolved_tags,
                     'resolvedLists'     => $resolved_lists,
+                    'resolvedCampaignLists' => $resolved_campaign_lists,
                 ],
             ], 200);
         }
@@ -2390,6 +2845,7 @@ JS;
 
         $tag_result = null;
         $list_result = null;
+        $campaign_list_result = null;
         $created_id = '';
         if (is_array($json_body)
             && !empty($json_body['data'][0]['details']['id'])
@@ -2429,6 +2885,17 @@ JS;
             }
         }
 
+        if (!empty($resolved_campaign_lists['keys'])) {
+            $campaign_list_result = $this->zoho_campaigns_subscribe_lists(
+                (string) $options['zoho_campaigns_base'],
+                (string) $token,
+                (int) $options['zoho_timeout'],
+                (string) $options['zoho_campaigns_source'],
+                (array) $resolved_campaign_lists['keys'],
+                $this->resolve_campaigns_contact_info($lead_unmapped, $lead)
+            );
+        }
+
         return new WP_REST_Response([
             'success'  => true,
             'httpCode' => $http_code,
@@ -2444,6 +2911,12 @@ JS;
                 'result'    => is_wp_error($list_result)
                     ? ['success' => false, 'error' => $list_result->get_error_message(), 'data' => $list_result->get_error_data()]
                     : (is_array($list_result) ? $list_result : null),
+            ],
+            'campaignLists' => [
+                'requested' => $resolved_campaign_lists,
+                'result'    => is_wp_error($campaign_list_result)
+                    ? ['success' => false, 'error' => $campaign_list_result->get_error_message(), 'data' => $campaign_list_result->get_error_data()]
+                    : (is_array($campaign_list_result) ? $campaign_list_result : null),
             ],
         ], 200);
     }
