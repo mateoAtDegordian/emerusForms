@@ -2540,12 +2540,19 @@ JS;
             $last_name = 'Website Lead';
         }
 
-        return [
-            'Email'      => $email,
-            'First Name' => $first_name,
-            'Last Name'  => $last_name,
-            'Phone'      => $phone,
+        // Zoho Campaigns listsubscribe expects "Contact Email" as mandatory key.
+        // Keep aliases for compatibility with account-side field variations.
+        $contact_info = [
+            'Contact Email' => $email,
+            'Email'         => $email,
+            'First Name'    => $first_name,
+            'Last Name'     => $last_name,
         ];
+        if ($phone !== '') {
+            $contact_info['Phone'] = $phone;
+        }
+
+        return $contact_info;
     }
 
     private function zoho_campaigns_subscribe_lists($campaigns_base, $token, $timeout, $source, array $list_keys, array $contact_info) {
@@ -2564,6 +2571,7 @@ JS;
             $final_source = 'Website';
         }
 
+        $contact_info_string = $this->build_campaigns_contactinfo_string($contact_info);
         $results = [];
         $all_ok = true;
         foreach ($list_keys as $list_key) {
@@ -2572,20 +2580,19 @@ JS;
                 continue;
             }
 
-            $body = [
+            $request_url = add_query_arg([
                 'resfmt'      => 'JSON',
                 'listkey'     => $clean_key,
                 'source'      => $final_source,
-                'contactinfo' => wp_json_encode($contact_info, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            ];
-
-            $response = wp_remote_post((string) $api_url, [
+                'contactinfo' => $contact_info_string,
+            ], $api_url);
+            $response = wp_remote_post((string) $request_url, [
                 'timeout' => (int) $timeout,
                 'headers' => [
                     'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
                     'Content-Type'  => 'application/x-www-form-urlencoded; charset=utf-8',
                 ],
-                'body' => $body,
+                'body' => [],
             ]);
 
             if (is_wp_error($response)) {
@@ -2603,6 +2610,39 @@ JS;
             $json_body = json_decode($raw_body, true);
             $status = is_array($json_body) && isset($json_body['status']) ? strtolower((string) $json_body['status']) : '';
             $ok = ($http_code >= 200 && $http_code < 300 && $status !== 'error');
+
+            if (!$ok) {
+                $error_code = is_array($json_body) && isset($json_body['code']) ? (string) $json_body['code'] : '';
+                if ($error_code === '903') {
+                    // Fallback endpoint: add subscriber by email only.
+                    $fallback_url = trailingslashit((string) $campaigns_base) . 'api/v1.1/addlistsubscribersinbulk';
+                    $fallback_response = wp_remote_post((string) $fallback_url, [
+                        'timeout' => (int) $timeout,
+                        'headers' => [
+                            'Authorization' => 'Zoho-oauthtoken ' . (string) $token,
+                            'Content-Type'  => 'application/x-www-form-urlencoded; charset=utf-8',
+                        ],
+                        'body' => [
+                            'resfmt'   => 'JSON',
+                            'listkey'  => $clean_key,
+                            'emailids' => $email,
+                        ],
+                    ]);
+                    if (!is_wp_error($fallback_response)) {
+                        $fb_http = (int) wp_remote_retrieve_response_code($fallback_response);
+                        $fb_raw = (string) wp_remote_retrieve_body($fallback_response);
+                        $fb_json = json_decode($fb_raw, true);
+                        $fb_status = is_array($fb_json) && isset($fb_json['status']) ? strtolower((string) $fb_json['status']) : '';
+                        $fb_ok = ($fb_http >= 200 && $fb_http < 300 && $fb_status !== 'error');
+                        if ($fb_ok) {
+                            $ok = true;
+                            $http_code = $fb_http;
+                            $json_body = $fb_json ?: $fb_raw;
+                        }
+                    }
+                }
+            }
+
             if (!$ok) {
                 $all_ok = false;
             }
@@ -2620,6 +2660,22 @@ JS;
             'httpCode' => $all_ok ? 200 : 502,
             'result'   => $results,
         ];
+    }
+
+    private function build_campaigns_contactinfo_string(array $contact_info) {
+        $pairs = [];
+        foreach ($contact_info as $key => $value) {
+            $k = trim(sanitize_text_field((string) $key));
+            $v = trim(sanitize_text_field((string) $value));
+            if ($k === '' || $v === '') {
+                continue;
+            }
+            $v = str_replace([',', '{', '}', ':'], ' ', $v);
+            $v = preg_replace('/\s+/', ' ', $v);
+            $pairs[] = $k . ':' . trim((string) $v);
+        }
+
+        return '{' . implode(',', $pairs) . '}';
     }
 
     private function sub_source_rule_matches($match, $form_key, $variant) {
